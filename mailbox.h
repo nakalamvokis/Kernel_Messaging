@@ -17,6 +17,30 @@
 #define BLOCK   1
 #define MAX_MSG_SIZE 128
 
+
+struct send_info
+{
+	pid_t dest;
+	void *msg;
+	int len;
+	bool block;
+};
+
+struct rcv_info
+{
+	pid_t *sender;
+	void *msg;
+	int *len;
+	bool block;
+};
+
+struct manage_info
+{
+	bool stop;
+	int *count;
+};
+
+
 /**
  * Functions for msgs
  *
