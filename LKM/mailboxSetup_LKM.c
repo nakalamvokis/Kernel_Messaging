@@ -34,6 +34,11 @@ asmlinkage long sys_mailbox_send(struct send_info *info)
 		return -EFAULT;
 	}
 
+	pid_t dest = kinfo.dest;
+	void *msg = kinfo.msg;
+	int len = kinfo.len;
+	bool block = kinfo.block;
+	
 	return 0;
 }
 
@@ -47,7 +52,12 @@ asmlinkage long sys_mailbox_rcv(struct rcv_info *info)
 	{
 		return -EFAULT;
 	}
-
+	
+	pid_t *sender = kinfo.sender;
+	void *msg = kinfo.msg;
+	int *len = kinfo.len;
+	bool block = kinfo.block;
+	
 	return 0;
 }
 
@@ -62,7 +72,9 @@ asmlinkage long sys_mailbox_manage(struct manage_info *info)
 	{
 		return -EFAULT;
 	}
-
+	
+	bool stop = kinfo.stop;
+	int *count = kinfo.count;
 
 	return 0;
 }
