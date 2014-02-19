@@ -17,6 +17,19 @@
 #define BLOCK   1
 #define MAX_MSG_SIZE 128
 
+#define NUM_MAILBOXES 150
+#define MAILBOX_SIZE 20
+
+// hash table of mailboxes -> pid is the key
+struct mailbox mailbox_table[NUM_MAILBOXES];
+
+// mailbox structure to be used for each process receiving messages
+struct mailbox
+{
+	pid_t process_pid;
+	char *messages[MAILBOX_SIZE];
+};
+
 
 // struct to be passed as parameter for send message syscall
 struct send_info
