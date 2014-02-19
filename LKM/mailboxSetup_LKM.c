@@ -25,6 +25,31 @@ asmlinkage long (*ref_sys_cs3013_syscall2)(void);
 asmlinkage long (*ref_sys_cs3013_syscall3)(void);
 
 
+// hash table functions (may want to place in seperate file)
+
+/* function to get locate mailbox in the mailbox hash table
+ * param pid -> process id of the process to recieve a message
+ * return i -> spot in hash table where mailbox is (returns -1 if mailbox is non existant)
+*/
+int getMailbox(pid_t pid)
+{
+	int i;
+	for(i = 0; i < NUM_MAILBOXES; i++)
+	{
+		if(mailbox_table[i].pid == pid)
+		{
+			return i;
+			break;
+		}
+	}
+	return -1;	
+}
+
+
+
+
+
+
 asmlinkage long sys_mailbox_send(struct send_info *info)
 {
 	struct send_info kinfo;
