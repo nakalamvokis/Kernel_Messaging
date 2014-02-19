@@ -18,6 +18,7 @@
 #define MAX_MSG_SIZE 128
 
 
+// struct to be passed as parameter for send message syscall
 struct send_info
 {
 	pid_t dest;
@@ -26,6 +27,8 @@ struct send_info
 	bool block;
 };
 
+
+// struct to be passed as parameter for recieve message syscall
 struct rcv_info
 {
 	pid_t *sender;
@@ -34,6 +37,8 @@ struct rcv_info
 	bool block;
 };
 
+
+// struct to be passed as parameter for manage syscall
 struct manage_info
 {
 	bool stop;
