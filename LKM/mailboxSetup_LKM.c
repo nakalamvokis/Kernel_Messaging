@@ -29,7 +29,7 @@ asmlinkage long (*ref_sys_cs3013_syscall3)(void);
 
 /* function to get locate mailbox in the mailbox hash table
  * param pid -> process id of the process to recieve a message
- * return i -> spot in hash table where mailbox is (returns -1 if mailbox is non existant)
+ * return i -> spot in hash table where mailbox is (returns MAILBOX_INVALID if mailbox is non existant)
 */
 int getMailbox(pid_t pid)
 {
@@ -42,10 +42,22 @@ int getMailbox(pid_t pid)
 			break;
 		}
 	}
-	return -1;	
+	return MAILBOX_INVALID;	
 }
 
-
+int flushMsg(pid_t pid)
+{
+	int m = getMailbox(pid);
+	int i, j;
+	
+	for (i = 0; i < MAILBOX_SIZE; i++)
+	{
+		for (j = 0; j < MAX_MSG_SIZE; j++)
+			mailbox_table[i][j] = NULL;
+	}
+	
+	return 0;
+}
 
 
 
@@ -55,14 +67,14 @@ asmlinkage long sys_mailbox_send(struct send_info *info)
 	struct send_info kinfo;
 
 	if(copy_from_user(&kinfo, info, sizeof(kinfo)))
-	{
-		return -EFAULT;
-	}
-
-	pid_t dest = kinfo.dest;
-	void *msg = kinfo.msg;
-	int len = kinfo.len;
-	bool block = kinfo.block;
+		return MSG_ARG_ERROR;
+		
+	if(kinfo.len > MAX_MSG_SIZE || kinfo.len < 0)
+		return MSG_LENGTH_ERROR;
+		
+	if(kinfo.block == TRUE)
+		return MAILBOX_STOPPED;
+	
 	
 	return 0;
 }
@@ -74,14 +86,10 @@ asmlinkage long sys_mailbox_rcv(struct rcv_info *info)
 	struct rcv_info kinfo;
 
 	if(copy_from_user(&kinfo, info, sizeof(kinfo)))
-	{
-		return -EFAULT;
-	}
-	
-	pid_t *sender = kinfo.sender;
-	void *msg = kinfo.msg;
-	int *len = kinfo.len;
-	bool block = kinfo.block;
+		return MSG_ARG_ERROR;
+		
+	if(kinfo.block == TRUE)
+		return MAILBOX_STOPPED;
 	
 	return 0;
 }
@@ -95,11 +103,9 @@ asmlinkage long sys_mailbox_manage(struct manage_info *info)
 
 	if(copy_from_user(&kinfo, info, sizeof(kinfo)))
 	{
-		return -EFAULT;
+		return MSG_ARG_ERROR;
 	}
 	
-	bool stop = kinfo.stop;
-	int *count = kinfo.count;
 
 	return 0;
 }
@@ -163,7 +169,8 @@ static int __init interceptor_start(void)
 	sys_call_table[__NR_cs3013_syscall3] = (unsigned long *)sys_mailbox_manage;
 
 	enable_page_protection();
-
+	
+	
 	/* And indicate the load was successful */
 	printk(KERN_INFO "Loaded interceptor!");
 
