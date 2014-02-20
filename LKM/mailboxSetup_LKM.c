@@ -53,7 +53,9 @@ int flushMsg(pid_t pid)
 	for (i = 0; i < MAILBOX_SIZE; i++)
 	{
 		for (j = 0; j < MAX_MSG_SIZE; j++)
+		{
 			mailbox_table[i][j] = NULL;
+		}
 	}
 	
 	return 0;
@@ -67,14 +69,19 @@ asmlinkage long sys_mailbox_send(struct send_info *info)
 	struct send_info kinfo;
 
 	if(copy_from_user(&kinfo, info, sizeof(kinfo)))
+	{
 		return MSG_ARG_ERROR;
+	}
 		
 	if(kinfo.len > MAX_MSG_SIZE || kinfo.len < 0)
+	{
 		return MSG_LENGTH_ERROR;
+	}
 		
 	if(kinfo.block == TRUE)
+	{
 		return MAILBOX_STOPPED;
-	
+	}
 	
 	return 0;
 }
@@ -86,10 +93,14 @@ asmlinkage long sys_mailbox_rcv(struct rcv_info *info)
 	struct rcv_info kinfo;
 
 	if(copy_from_user(&kinfo, info, sizeof(kinfo)))
+	{
 		return MSG_ARG_ERROR;
+	}
 		
 	if(kinfo.block == TRUE)
+	{
 		return MAILBOX_STOPPED;
+	}
 	
 	return 0;
 }
