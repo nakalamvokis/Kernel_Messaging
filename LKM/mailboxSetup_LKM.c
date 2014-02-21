@@ -35,6 +35,7 @@ int initMailbox()
 	{
 		mailbox_table[i].process_pid = -1;
 		mailbox_table[i].messages = NULL;
+		mailbox_table[i].count = 0;
 	}
 	num_mailboxes = 0;
 	return 0;
@@ -42,13 +43,14 @@ int initMailbox()
 /* function to get locate mailbox in the mailbox hash table
  * param pid -> process id of the process to recieve a message
  * return i -> spot in hash table where mailbox is (returns MAILBOX_INVALID if mailbox is non existant)
+ * getMailbox(-1) returns the next free mailbox
 */
 int getMailbox(pid_t pid)
 {
 	int i;
 	for(i = 0; i < NUM_MAILBOXES; i++)
 	{
-		if(mailbox_table[i].pid == pid)
+		if(mailbox_table[i].process_pid == pid)
 		{
 			return i;
 		}
@@ -61,11 +63,17 @@ int getMailbox(pid_t pid)
  */
 void createMailbox(pid_t pid)
 {
+	int i;
 	struct mailbox new_mailbox;
 	new_mailbox.pid = pid;
 	new_mailbox.place = 0;
-	mailbox_table[num_mailboxes] = new_mailbox;
-	num_mailboxes++;
+	for (i = 0; i < NUM_MAILBOXES; i++)
+	{
+		if (mailbox_table[i].process_pid == -1)
+		{
+			mailbox_table[i] = new_mailbox;
+		}
+	}
 }
 
 /* function to delete a mailbox
@@ -77,14 +85,11 @@ int deleteMailbox(pid_t pid)
 	int i;
 	for(i = 0; i < NUM_MAILBOXES; i++)
 	{
-		if(mailbox_table[i].pid == pid)
+		if (mailbox_table[i].process_pid == pid)
 		{
-			int j;
-			for (j = i; j < num_mailboxes - 1; j++)
-			{
-				mailbox_table[j] = mailbox_table[j+1];
-			}
-			num_mailboxes--;
+			mailbox_table[i].process_pid = -1;
+			mailbox_table[i].count = 0;
+			flushMsg(pid);
 			return i;
 		}
 	}
@@ -237,7 +242,12 @@ static int __init interceptor_start(void)
 
 	enable_page_protection();
 	
-	
+	/* Initialize the mailboxes */
+	if (!initMailbox())
+	{
+		//Couldn't init the mailboxes for some reason.
+		return -1;
+	}
 	/* And indicate the load was successful */
 	printk(KERN_INFO "Loaded interceptor!");
 
