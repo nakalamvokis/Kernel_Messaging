@@ -39,13 +39,14 @@ int getMailbox(pid_t pid)
 		if(mailbox_table[i].pid == pid)
 		{
 			return i;
-			break;
 		}
 	}
 	return MAILBOX_INVALID;	
 }
 
-
+/* function to create new mailbox
+ * param pid -> pid of process to be assigned a mailbox
+ */
 void createMailbox(pid_t pid)
 {
 	struct mailbox new_mailbox;
@@ -55,6 +56,30 @@ void createMailbox(pid_t pid)
 	num_mailboxes++;
 	
 }
+
+/* function to delete a mailbox
+ * param pid -> process of mailbox to be deleted
+ * return i -> place in mailbox_table that was deleted
+ */
+int deleteMailbox(pid_t pid)
+{
+	int i;
+	for(i = 0; i < NUM_MAILBOXES; i++)
+	{
+		if(mailbox_table[i].pid == pid)
+		{
+			int j;
+			for (j = i; j < num_mailboxes - 1; j++)
+			{
+				mailbox_table[j] = mailbox_table[j+1];
+			}
+			num_mailboxes--;
+			return i;
+		}
+	}
+	return MAILBOX_INVALID;	
+}
+
 
 
 int flushMsg(pid_t pid)
