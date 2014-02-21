@@ -36,6 +36,7 @@ int initMailbox()
 		mailbox_table[i].process_pid = -1;
 		mailbox_table[i].messages = NULL;
 	}
+	num_mailboxes = 0;
 	return 0;
 }
 /* function to get locate mailbox in the mailbox hash table
