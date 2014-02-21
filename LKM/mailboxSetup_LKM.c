@@ -45,6 +45,18 @@ int getMailbox(pid_t pid)
 	return MAILBOX_INVALID;	
 }
 
+
+void createMailbox(pid_t pid)
+{
+	struct mailbox new_mailbox;
+	new_mailbox.pid = pid;
+	new_mailbox.place = 0;
+	mailbox_table[num_mailboxes] = new_mailbox;
+	num_mailboxes++;
+	
+}
+
+
 int flushMsg(pid_t pid)
 {
 	int m = getMailbox(pid);
@@ -91,6 +103,12 @@ asmlinkage long sys_mailbox_send(struct send_info *info)
 asmlinkage long sys_mailbox_rcv(struct rcv_info *info)
 {
 	struct rcv_info kinfo;
+	
+	if((num_mailboxes == 0) || (getMailbox(current.pid) == MAILBOX_INVALID))
+	{
+		createMailbox(current.pid);
+	}
+	
 
 	if(copy_from_user(&kinfo, info, sizeof(kinfo)))
 	{
