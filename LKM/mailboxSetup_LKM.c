@@ -67,7 +67,7 @@ void createMailbox(pid_t pid)
 	int i;
 	struct mailbox new_mailbox;
 	new_mailbox.pid = pid;
-	new_mailbox.place = 0;
+	new_mailbox.count = 0;
 	for (i = 0; i < NUM_MAILBOXES; i++)
 	{
 		if (mailbox_table[i].process_pid == -1)
@@ -79,7 +79,7 @@ void createMailbox(pid_t pid)
 
 /* function to delete a mailbox
  * param pid -> process of mailbox to be deleted
- * return i -> place in mailbox_table that was deleted
+ * return i -> count in mailbox_table that was deleted
  */
 int deleteMailbox(pid_t pid)
 {
@@ -123,20 +123,29 @@ int flushMsg(pid_t pid)
 asmlinkage long sys_mailbox_send(struct send_info *info)
 {
 	struct send_info kinfo;
-
+	pid_t pid = getpid();
+	
 	if(copy_from_user(&kinfo, info, sizeof(kinfo)))
 	{
 		return MSG_ARG_ERROR;
 	}
-		
+	
+	if(kinfo.block == TRUE)
+	{
+		return MAILBOX_STOPPED;
+	}
 	if(kinfo.len > MAX_MSG_SIZE || kinfo.len < 0)
 	{
 		return MSG_LENGTH_ERROR;
 	}
-		
-	if(kinfo.block == TRUE)
+	if(getMailbox(kinfo.dest) == MAILBOX_INVALID)
 	{
-		return MAILBOX_STOPPED;
+		return MAILBOX_INVALID
+	}
+	
+	if(getMailbox(pid) == MAILBOX_INVALID)
+	{
+		createMailbox(pid);
 	}
 	
 	return 0;
@@ -148,22 +157,20 @@ asmlinkage long sys_mailbox_rcv(struct rcv_info *info)
 {
 	struct rcv_info kinfo;
 	pid_t pid = getpid();
-	if(getMailbox(pid) == MAILBOX_INVALID)
-	{
-		createMailbox(pid);
-	}
 	
 
-	if(copy_from_user(&kinfo, info, sizeof(kinfo)))
+	if (copy_from_user(&kinfo, info, sizeof(kinfo)))
 	{
 		return MSG_ARG_ERROR;
 	}
-		
-	if(kinfo.block == TRUE)
+	if (kinfo.block == TRUE)
 	{
 		return MAILBOX_STOPPED;
 	}
-	
+	if (getMailbox(pid) == MAILBOX_INVALID)
+	{
+		createMailbox(pid);
+	}
 	return 0;
 }
 
@@ -173,20 +180,20 @@ asmlinkage long sys_mailbox_rcv(struct rcv_info *info)
 asmlinkage long sys_mailbox_manage(struct manage_info *info)
 {
 	struct manage_info kinfo;
-
+	pid_t pid = getpid();
+	
 	if(copy_from_user(&kinfo, info, sizeof(kinfo)))
 	{
 		return MSG_ARG_ERROR;
 	}
 	
-	pid_t pid = getpid();
+
 	mailbox m = getMailbox(pid);
-	if (m == NULL)
+	if (m == MAILBOX_INVALID)
 	{
 		createMailbox(pid);
 		m = getMailbox(pid);
 	}
-	
 	m.stop = kinfo.stop;
 	kinfo.count = m.count;
 	
