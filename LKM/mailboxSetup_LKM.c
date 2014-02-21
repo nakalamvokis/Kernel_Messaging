@@ -73,6 +73,7 @@ void createMailbox(pid_t pid)
 		if (mailbox_table[i].process_pid == -1)
 		{
 			mailbox_table[i] = new_mailbox;
+			break;
 		}
 	}
 }
