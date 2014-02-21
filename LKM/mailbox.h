@@ -21,17 +21,17 @@
 #define MAILBOX_SIZE 20
 
 // hash table of mailboxes -> pid is the key
-struct mailbox mailbox_table[NUM_MAILBOXES];
-int num_mailboxes = 0;
 
 // mailbox structure to be used for each process receiving messages
-struct mailbox
+typedef struct mailbox
 {
 	pid_t process_pid;
 	int place;
 	char messages[MAILBOX_SIZE][MAX_MSG_SIZE];
-};
+} mailbox;
 
+static struct mailbox mailbox_table[NUM_MAILBOXES];
+static int num_mailboxes;
 
 // struct to be passed as parameter for send message syscall
 struct send_info

@@ -26,7 +26,18 @@ asmlinkage long (*ref_sys_cs3013_syscall3)(void);
 
 
 // hash table functions (may want to place in seperate file)
-
+/* function to initialize the table
+ * returns 0 on success or error message */
+int initMailbox()
+{
+	int i;
+	for (i = 0; i < NUM_MAILBOXES; i++)
+	{
+		mailbox_table[i].process_pid = -1;
+		mailbox_table[i].messages = NULL;
+	}
+	return 0;
+}
 /* function to get locate mailbox in the mailbox hash table
  * param pid -> process id of the process to recieve a message
  * return i -> spot in hash table where mailbox is (returns MAILBOX_INVALID if mailbox is non existant)
@@ -54,7 +65,6 @@ void createMailbox(pid_t pid)
 	new_mailbox.place = 0;
 	mailbox_table[num_mailboxes] = new_mailbox;
 	num_mailboxes++;
-	
 }
 
 /* function to delete a mailbox
@@ -81,7 +91,9 @@ int deleteMailbox(pid_t pid)
 }
 
 
-
+/** function to delete all messages in a mailbox
+ * param pid -> process of mailbox
+ * return 0 on success or error message */
 int flushMsg(pid_t pid)
 {
 	int m = getMailbox(pid);
