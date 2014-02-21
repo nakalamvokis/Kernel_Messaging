@@ -22,11 +22,13 @@
 
 // hash table of mailboxes -> pid is the key
 struct mailbox mailbox_table[NUM_MAILBOXES];
+int num_mailboxes = 0;
 
 // mailbox structure to be used for each process receiving messages
 struct mailbox
 {
 	pid_t process_pid;
+	int place;
 	char messages[MAILBOX_SIZE][MAX_MSG_SIZE];
 };
 
