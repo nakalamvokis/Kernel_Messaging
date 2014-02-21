@@ -26,7 +26,8 @@
 typedef struct mailbox
 {
 	pid_t process_pid;
-	int place;
+	int count;
+	bool stop;
 	char messages[MAILBOX_SIZE][MAX_MSG_SIZE];
 } mailbox;
 

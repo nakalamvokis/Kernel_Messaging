@@ -16,6 +16,7 @@
 #include <linux/kernel.h>
 #include <linux/module.h>
 #include <linux/syscalls.h>
+#include <unistd.h>
 #include "mailbox.h"
 
 unsigned long **sys_call_table;
@@ -146,10 +147,10 @@ asmlinkage long sys_mailbox_send(struct send_info *info)
 asmlinkage long sys_mailbox_rcv(struct rcv_info *info)
 {
 	struct rcv_info kinfo;
-	
-	if((num_mailboxes == 0) || (getMailbox(current.pid) == MAILBOX_INVALID))
+	pid_t pid = getpid();
+	if(getMailbox(pid) == MAILBOX_INVALID)
 	{
-		createMailbox(current.pid);
+		createMailbox(pid);
 	}
 	
 
@@ -178,7 +179,22 @@ asmlinkage long sys_mailbox_manage(struct manage_info *info)
 		return MSG_ARG_ERROR;
 	}
 	
-
+	pid_t pid = getpid();
+	mailbox m = getMailbox(pid);
+	if (m == NULL)
+	{
+		createMailbox(pid);
+		m = getMailbox(pid);
+	}
+	
+	m.stop = kinfo.stop;
+	kinfo.count = m.count;
+	
+	if(copy_to_user(info, &kinfo, sizeof(kinfo)))
+	{
+		return MSG_ARG_ERROR;
+	}
+	
 	return 0;
 }
 
