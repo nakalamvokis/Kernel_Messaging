@@ -28,38 +28,26 @@ typedef struct mailbox
 	pid_t process_pid;
 	int count;
 	bool stop;
-	char messages[MAILBOX_SIZE][MAX_MSG_SIZE];
+	mesage_info messages[MAILBOX_SIZE];
 } mailbox;
 
-static struct mailbox mailbox_table[NUM_MAILBOXES];
-static int num_mailboxes;
-
-// struct to be passed as parameter for send message syscall
-struct send_info
+// struct to be passed as parameter for send and recieve message syscall
+typedef struct message_info
 {
+	pid_t *sender;
 	pid_t dest;
 	void *msg;
 	int len;
 	bool block;
-};
-
-
-// struct to be passed as parameter for recieve message syscall
-struct rcv_info
-{
-	pid_t *sender;
-	void *msg;
-	int *len;
-	bool block;
-};
+} message_info;
 
 
 // struct to be passed as parameter for manage syscall
-struct manage_info
+typedef struct manage_info
 {
 	bool stop;
 	int *count;
-};
+} manage_info;
 
 
 /**
