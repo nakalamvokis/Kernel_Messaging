@@ -2,7 +2,6 @@
 
 
 
-
 /* function to send a message to another running process (using syscalls)
  * param dest -> process ID of recipient
  * param *msg -> uninterpreted array of bytes (message)
@@ -11,7 +10,7 @@
  */
 long SendMsg(pid_t dest, void *msg, int len, bool block)
 {
-	struct send_info info;
+	message_info info;
 	
 	info.dest = dest;
 	info.msg = msg;
@@ -31,7 +30,7 @@ long SendMsg(pid_t dest, void *msg, int len, bool block)
  */
 long RcvMsg(pid_t *sender, void *msg, int *len, bool block)
 {
-	struct rcv_info info;
+	message_info info;
 	
 	info.sender = sender;
 	info.msg = msg;
