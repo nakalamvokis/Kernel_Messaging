@@ -148,8 +148,21 @@ char* getMessage(*mailbox m, void *msg)
 
 int deleteMessage(*mailbox m, void *msg)
 {
+	int i;
+	for(i = 0; i < count; i++)
+	{
+		if((strcmp(*msg, m[i].msg) == 0)
+		{
+			int j;
+			for(j = i; j < MAILBOX_SIZE - 1; j++)
+			{
+				m[j] = m[j+1];
+			}
+			return 0;
+		}
+	}
 	
-	
+	return MAILBOX_ERROR;
 	
 }
 
