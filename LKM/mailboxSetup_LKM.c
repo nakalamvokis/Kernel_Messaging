@@ -119,6 +119,31 @@ int flushMsg(pid_t pid)
 
 
 
+int addMessage()
+{
+	
+	
+	
+}
+
+
+int getMessage()
+{
+	
+	
+	
+}
+
+
+char* deleteMessage()
+{
+	
+	
+	
+}
+
+
+
 
 asmlinkage long sys_mailbox_send(struct send_info *info)
 {
@@ -141,8 +166,9 @@ asmlinkage long sys_mailbox_send(struct send_info *info)
 		createMailbox(pid);
 	
 	mailbox m = mailbox_table[getMailbox(pid)];
-	// queueAdd(mailbox *m, void *msg)
-	queueAdd(&m, kinfo.msg);
+	
+	// add message to mailbox
+	addMessage(&m, kinfo.msg);
 	
 	
 	
@@ -167,9 +193,13 @@ asmlinkage long sys_mailbox_rcv(struct rcv_info *info)
 		createMailbox(pid);
 	
 	
-	mailbox m = mailbox_table[getMailbox(pid)];	
-	kinfo.msg = messageGet(pid,*m);
-	m.
+	mailbox m = mailbox_table[getMailbox(pid)];
+	
+	// return a message pointer
+	char* message = getMessage(&m, *msg);
+	
+	// delete message from mailbox
+	deleteMessage(&m, *msg);
 
 	return 0;
 }
