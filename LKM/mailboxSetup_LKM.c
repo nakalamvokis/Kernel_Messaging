@@ -25,6 +25,7 @@ asmlinkage long (*ref_sys_cs3013_syscall1)(void);
 asmlinkage long (*ref_sys_cs3013_syscall2)(void);
 asmlinkage long (*ref_sys_cs3013_syscall3)(void);
 
+static mailbox mailbox_table[NUM_MAILBOXES];
 
 // hash table functions (may want to place in seperate file)
 /* function to initialize the table
@@ -52,9 +53,7 @@ int getMailbox(pid_t pid)
 	for(i = 0; i < NUM_MAILBOXES; i++)
 	{
 		if(mailbox_table[i].process_pid == pid)
-		{
 			return i;
-		}
 	}
 	return MAILBOX_INVALID;	
 }
@@ -76,6 +75,8 @@ void createMailbox(pid_t pid)
 			break;
 		}
 	}
+	
+	return MAILBOX_ERROR;
 }
 
 /* function to delete a mailbox
@@ -110,9 +111,7 @@ int flushMsg(pid_t pid)
 	for (i = 0; i < MAILBOX_SIZE; i++)
 	{
 		for (j = 0; j < MAX_MSG_SIZE; j++)
-		{
-			mailbox_table[i][j] = NULL;
-		}
+			mailbox_table[i].messages[j] = NULL;
 	}
 	
 	return 0;
@@ -127,27 +126,25 @@ asmlinkage long sys_mailbox_send(struct send_info *info)
 	pid_t pid = getpid();
 	
 	if(copy_from_user(&kinfo, info, sizeof(kinfo)))
-	{
 		return MSG_ARG_ERROR;
-	}
 	
 	if(kinfo.block == TRUE)
-	{
 		return MAILBOX_STOPPED;
-	}
+		
 	if(kinfo.len > MAX_MSG_SIZE || kinfo.len < 0)
-	{
 		return MSG_LENGTH_ERROR;
-	}
+
 	if(getMailbox(kinfo.dest) == MAILBOX_INVALID)
-	{
 		return MAILBOX_INVALID
-	}
 	
 	if(getMailbox(pid) == MAILBOX_INVALID)
-	{
 		createMailbox(pid);
-	}
+	
+	mailbox m = mailbox_table[getMailbox(pid)];
+	// queueAdd(mailbox *m, void *msg)
+	queueAdd(&m, kinfo.msg);
+	
+	
 	
 	return 0;
 }
@@ -161,17 +158,19 @@ asmlinkage long sys_mailbox_rcv(struct rcv_info *info)
 	
 
 	if (copy_from_user(&kinfo, info, sizeof(kinfo)))
-	{
 		return MSG_ARG_ERROR;
-	}
+
 	if (kinfo.block == TRUE)
-	{
 		return MAILBOX_STOPPED;
-	}
+
 	if (getMailbox(pid) == MAILBOX_INVALID)
-	{
 		createMailbox(pid);
-	}
+	
+	
+	mailbox m = mailbox_table[getMailbox(pid)];	
+	kinfo.msg = messageGet(pid,*m);
+	m.
+
 	return 0;
 }
 
