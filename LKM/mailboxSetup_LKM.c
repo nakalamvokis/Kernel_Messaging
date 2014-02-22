@@ -119,23 +119,34 @@ int flushMsg(pid_t pid)
 
 
 
-int addMessage()
+int addMessage(*mailbox m, *message_info info)
 {
+	if (!(count == MAILBOX_SIZE))
+		return MAILBOX_ERROR;
+		
+	*m[count] = *info;
+	count++;	
+	return 0;
+}
+
+
+char* getMessage(*mailbox m, void *msg)
+{
+	int i;
+	for(i = 0; i < count; i++)
+	{
+		if((strcmp(*msg, m[i].msg) == 0)
+		{
+			return msg;
+		}
+	}
 	
-	
+	return MAILBOX_ERROR;
 	
 }
 
 
-int getMessage()
-{
-	
-	
-	
-}
-
-
-char* deleteMessage()
+int deleteMessage(*mailbox m, void *msg)
 {
 	
 	
@@ -147,7 +158,7 @@ char* deleteMessage()
 
 asmlinkage long sys_mailbox_send(struct send_info *info)
 {
-	struct send_info kinfo;
+	message_info kinfo;
 	pid_t pid = getpid();
 	
 	if(copy_from_user(&kinfo, info, sizeof(kinfo)))
@@ -168,9 +179,7 @@ asmlinkage long sys_mailbox_send(struct send_info *info)
 	mailbox m = mailbox_table[getMailbox(pid)];
 	
 	// add message to mailbox
-	addMessage(&m, kinfo.msg);
-	
-	
+	addMessage(&m, &kinfo);
 	
 	return 0;
 }
@@ -179,7 +188,7 @@ asmlinkage long sys_mailbox_send(struct send_info *info)
 
 asmlinkage long sys_mailbox_rcv(struct rcv_info *info)
 {
-	struct rcv_info kinfo;
+	message_info kinfo;
 	pid_t pid = getpid();
 	
 
