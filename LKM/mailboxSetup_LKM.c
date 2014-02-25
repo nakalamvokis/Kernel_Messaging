@@ -20,7 +20,6 @@
 #include <linux/unistd.h>
 #include <linux/mailbox.h>
 
-#define NUM_MAILBOXES 150
 #define MAILBOX_SIZE 20
 
 // mailbox structure to be used for each process receiving messages
@@ -152,59 +151,71 @@ int deleteMailbox(pid_t pid)
 }
 
 
-int addMessage(*mailbox m, *message_info info)
+// MAILBOX FUNCTIONS
+
+/*
+typedef struct mailbox
 {
-	if (!(count == MAILBOX_SIZE))
-		return MAILBOX_ERROR;
-		
-	*m[count] = *info;
-	count++;	
+	pid_t process_pid;
+	spinlock_t mlock;
+	int count;
+	bool block;
+	message_info messages[MAILBOX_SIZE];
+} mailbox;
+
+
+typedef struct message_info
+{
+	pid_t *sender;
+	pid_t dest;
+	void *msg;
+	int len;
+	bool block;
+} message_info;
+
+*/
+
+
+int addMessage(mailbox* m, message_info* info)
+{
+	if(count == MAX_MESSAGES)
+	{
+		return MAILBOX_FULL;
+	}
+
+	m->messages[count] = *info;
+	m->count++;
 	return 0;
 }
 
 
-char* getMessage(*mailbox m, void *msg)
+message_info* getMessage(mailbox* m)
 {
-	int i;
-	for(i = 0; i < count; i++)
+	if(m->count == 0)
 	{
-		if((strcmp(*msg, m[i].msg) == 0)
-		{
-			return msg;
-		}
+		return MAILBOX_EMPTY;
 	}
-	
-	return MAILBOX_ERROR;
-	
+
+	return &(m->messages[0]);
 }
 
 
-int deleteMessage(*mailbox m, void *msg)
+int deleteMessage(*mailbox m)
 {
-	int i;
 	for(i = 0; i < count; i++)
 	{
-		if((strcmp(*msg, m[i].msg) == 0)
-		{
-			int j;
-			for(j = i; j < MAILBOX_SIZE - 1; j++)
-			{
-				m[j] = m[j+1];
-			}
-			return 0;
-		}
+		m->messages[i] = m->messages[i+1];
 	}
-	
-	return MAILBOX_ERROR;
+	m->count--;
+	return 0;
 }
-
-
 
 
 asmlinkage long sys_mailbox_send(struct send_info *info)
 {
 	message_info kinfo;
-	pid_t pid = getpid();
+	pid_t pid = kinfo.dest;
+	kinfo.sender = getpid();
 	
 	if(copy_from_user(&kinfo, info, sizeof(kinfo)))
 		return MSG_ARG_ERROR;
@@ -215,13 +226,13 @@ asmlinkage long sys_mailbox_send(struct send_info *info)
 	if(kinfo.len > MAX_MSG_SIZE || kinfo.len < 0)
 		return MSG_LENGTH_ERROR;
 
-	if(getMailbox(kinfo.dest) == MAILBOX_INVALID)
+	if(getMailbox(pid) == MAILBOX_INVALID)
 		return MAILBOX_INVALID
 	
 	if(getMailbox(pid) == MAILBOX_INVALID)
 		createMailbox(pid);
 	
-	mailbox m = mailbox_table[getMailbox(pid)];
+	mailbox* m = getMailbox(pid);
 	
 	// add message to mailbox
 	addMessage(&m, &kinfo);
@@ -247,13 +258,18 @@ asmlinkage long sys_mailbox_rcv(struct rcv_info *info)
 		createMailbox(pid);
 	
 	
-	mailbox m = mailbox_table[getMailbox(pid)];
+	mailbox* m = getMailbox(pid);
 	
-	// return a message pointer
-	char* message = getMessage(&m, *msg);
+	// get a message_info
+	kinfo = getMessage(&m);
+
+	if(copy_to_user(&info, kinfo, sizeof(kinfo)))
+	{
+		return MAILBOX_ERROR;
+	}
 	
-	// delete message from mailbox
-	deleteMessage(&m, *msg);
+	// delete sent message from mailbox
+	deleteMessage(&message, *msg);
 
 	return 0;
 }
