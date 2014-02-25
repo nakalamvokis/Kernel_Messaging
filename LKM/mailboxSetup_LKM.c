@@ -19,6 +19,9 @@
 #include <unistd.h>
 #include "mailbox.h"
 
+#define NUM_MAILBOXES 150
+#define MAILBOX_SIZE 20
+
 unsigned long **sys_call_table;
 
 asmlinkage long (*ref_sys_cs3013_syscall1)(void);

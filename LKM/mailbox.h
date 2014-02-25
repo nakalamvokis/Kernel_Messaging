@@ -6,21 +6,15 @@
 * Modified for CS-3013, C-term 2012
 *
 */
-
 #ifndef __MAILBOX__
 #define __MAILBOX__
 
 #include <stdbool.h>
-#include <linux/types.h>
+#include <sys/types.h>
 
 #define NO_BLOCK 0
 #define BLOCK   1
 #define MAX_MSG_SIZE 128
-
-#define NUM_MAILBOXES 150
-#define MAILBOX_SIZE 20
-
-// hash table of mailboxes -> pid is the key
 
 // mailbox structure to be used for each process receiving messages
 typedef struct mailbox
