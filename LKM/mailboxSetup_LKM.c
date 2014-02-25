@@ -19,18 +19,9 @@
 #include <linux/slab.h>
 #include <linux/unistd.h>
 #include <linux/mailbox.h>
+//#include <sys/types.h>
 
 #define MAILBOX_SIZE 20
-
-// mailbox structure to be used for each process receiving messages
-typedef struct mailbox
-{
-	pid_t process_pid;
-	spinlock_t mlock;
-	int count;
-	bool block;
-	message_info messages[MAILBOX_SIZE];
-} mailbox;
 
 // struct to be passed as parameter for send and recieve message syscall
 typedef struct message_info
@@ -41,6 +32,17 @@ typedef struct message_info
 	int len;
 	bool block;
 } message_info;
+
+
+// mailbox structure to be used for each process receiving messages
+typedef struct mailbox
+{
+	pid_t pid;
+	spinlock_t mlock;
+	int count;
+	bool stop;
+	message_info messages[MAILBOX_SIZE];
+} mailbox;
 
 
 // struct to be passed as parameter for manage syscall
@@ -55,13 +57,13 @@ typedef struct list_node
 {
 	mailbox* box;
 	pid_t pid;
-	list_node next_node;
+	struct list_node* next_node;
 } list_node;
 
 
 typedef struct hash_table
 {
-	list_node **head;
+	list_node *head;
 } hash_table;
 
 unsigned long **sys_call_table;
@@ -70,9 +72,19 @@ asmlinkage long (*ref_sys_cs3013_syscall1)(void);
 asmlinkage long (*ref_sys_cs3013_syscall2)(void);
 asmlinkage long (*ref_sys_cs3013_syscall3)(void);
 
-static struct kmem_cache kcache;
+static struct kmem_cache* kcache;
 static hash_table h;
  
+int createMailbox(pid_t pid);
+mailbox* getMailbox(pid_t pid);
+int deleteMailbox(pid_t pid);
+
+int addMessage(mailbox* m, message_info* info);
+message_info* getMessage(mailbox* m);
+int deleteMessage(mailbox* m);
+
+
+
 // HASH TABLE FUNCTIONS
 
 /* function to create new mailbox
@@ -81,9 +93,9 @@ static hash_table h;
 int createMailbox(pid_t pid)
 {
 	list_node* node_ptr;
-	mailbox new_mailbox = kmem_cache_alloc(&kcache, GFP_KERNEL);
-	new_mailbox.pid = pid;
-	new_mailbox.count = 0;
+	mailbox* new_mailbox = kmem_cache_alloc(kcache, GFP_KERNEL);
+	new_mailbox->pid = pid;
+	new_mailbox->count = 0;
 
 	node_ptr = h.head;
 	while(node_ptr != NULL)
@@ -91,7 +103,7 @@ int createMailbox(pid_t pid)
 		node_ptr = node_ptr->next_node;
 	}
 
-	node_ptr->box = &new_mailbox;
+	node_ptr->box = new_mailbox;
 
 	return 0;
 }
@@ -104,7 +116,6 @@ int createMailbox(pid_t pid)
 */
 mailbox* getMailbox(pid_t pid)
 {
-	mailbox* mailbox_ptr;
 	list_node* node_ptr;
 	node_ptr = h.head;
 
@@ -135,55 +146,33 @@ int deleteMailbox(pid_t pid)
 	{
 		return MAILBOX_INVALID;
 	}
-	kmem_free(m);
+
+	kmem_cache_free(kcache,m);
 
 	while(node_ptr != NULL)
 	{
 		if (node_ptr->next_node->pid == pid)
 		{
-			node_ptr->next_node == node_ptr->next_node->next_node;
+			node_ptr->next_node = node_ptr->next_node->next_node;
 			return 0;
 		}
-		nodeptr = nodeptr->next_node;
+		node_ptr = node_ptr->next_node;
 	}
 
-	return MAILBOX_INVALID
+	return MAILBOX_INVALID;
 }
 
 
 // MAILBOX FUNCTIONS
 
-/*
-typedef struct mailbox
-{
-	pid_t process_pid;
-	spinlock_t mlock;
-	int count;
-	bool block;
-	message_info messages[MAILBOX_SIZE];
-} mailbox;
-
-
-typedef struct message_info
-{
-	pid_t *sender;
-	pid_t dest;
-	void *msg;
-	int len;
-	bool block;
-} message_info;
-
-*/
-
-
 int addMessage(mailbox* m, message_info* info)
 {
-	if(count == MAX_MESSAGES)
+	if(m->count == MAILBOX_SIZE)
 	{
 		return MAILBOX_FULL;
 	}
 
-	m->messages[count] = *info;
+	m->messages[m->count] = *info;
 	m->count++;
 	return 0;
 }
@@ -193,16 +182,17 @@ message_info* getMessage(mailbox* m)
 {
 	if(m->count == 0)
 	{
-		return MAILBOX_EMPTY;
+		return NULL;
 	}
 
 	return &(m->messages[0]);
 }
 
 
-int deleteMessage(*mailbox m)
+int deleteMessage(mailbox* m)
 {
-	for(i = 0; i < count; i++)
+	int i;
+	for(i = 0; i < m->count; i++)
 	{
 		m->messages[i] = m->messages[i+1];
 	}
@@ -211,38 +201,38 @@ int deleteMessage(*mailbox m)
 }
 
 
-asmlinkage long sys_mailbox_send(struct send_info *info)
+asmlinkage long sys_mailbox_send(struct message_info *info)
 {
 	message_info kinfo;
 	pid_t pid = kinfo.dest;
-	kinfo.sender = getpid();
+	*(kinfo.sender) = getpid();
 	
 	if(copy_from_user(&kinfo, info, sizeof(kinfo)))
 		return MSG_ARG_ERROR;
 	
-	if(kinfo.block == TRUE)
+	if(kinfo.block == true)
 		return MAILBOX_STOPPED;
 		
 	if(kinfo.len > MAX_MSG_SIZE || kinfo.len < 0)
 		return MSG_LENGTH_ERROR;
 
-	if(getMailbox(pid) == MAILBOX_INVALID)
-		return MAILBOX_INVALID
+	if(getMailbox(pid) == NULL)
+		return MAILBOX_INVALID;
 	
-	if(getMailbox(pid) == MAILBOX_INVALID)
-		createMailbox(pid);
+	if(getMailbox(*(kinfo.sender)) == NULL)
+		createMailbox(*(kinfo.sender));
 	
 	mailbox* m = getMailbox(pid);
 	
 	// add message to mailbox
-	addMessage(&m, &kinfo);
+	addMessage(m, &kinfo);
 	
 	return 0;
 }
 
 
 
-asmlinkage long sys_mailbox_rcv(struct rcv_info *info)
+asmlinkage long sys_mailbox_rcv(struct message_info *info)
 {
 	message_info kinfo;
 	pid_t pid = getpid();
@@ -251,25 +241,25 @@ asmlinkage long sys_mailbox_rcv(struct rcv_info *info)
 	if (copy_from_user(&kinfo, info, sizeof(kinfo)))
 		return MSG_ARG_ERROR;
 
-	if (kinfo.block == TRUE)
+	if (kinfo.block == true)
 		return MAILBOX_STOPPED;
 
-	if (getMailbox(pid) == MAILBOX_INVALID)
+	if (getMailbox(pid) == NULL)
 		createMailbox(pid);
 	
 	
 	mailbox* m = getMailbox(pid);
 	
 	// get a message_info
-	kinfo = getMessage(&m);
+	kinfo = *(getMessage(m));
 
-	if(copy_to_user(&info, kinfo, sizeof(kinfo)))
+	if(copy_to_user(&info, &kinfo, sizeof(kinfo)))
 	{
 		return MAILBOX_ERROR;
 	}
 	
 	// delete sent message from mailbox
-	deleteMessage(&message, *msg);
+	deleteMessage(m);
 
 	return 0;
 }
@@ -288,14 +278,14 @@ asmlinkage long sys_mailbox_manage(struct manage_info *info)
 	}
 	
 
-	mailbox m = getMailbox(pid);
-	if (m == MAILBOX_INVALID)
+	mailbox* m = getMailbox(pid);
+	if (m == NULL)
 	{
 		createMailbox(pid);
 		m = getMailbox(pid);
 	}
-	m.stop = kinfo.stop;
-	kinfo.count = m.count;
+	m->stop = kinfo.stop;
+	*(kinfo.count) = m->count;
 	
 	if(copy_to_user(info, &kinfo, sizeof(kinfo)))
 	{
@@ -365,12 +355,6 @@ static int __init interceptor_start(void)
 
 	enable_page_protection();
 	
-	/* Initialize the mailboxes */
-	if (!initMailbox())
-	{
-		//Couldn't init the mailboxes for some reason.
-		return -1;
-	}
 	kcache = kmem_cache_create("Mailboxes", sizeof(mailbox), 0, 0, NULL);
 	/* And indicate the load was successful */
 	printk(KERN_INFO "Loaded interceptor!");
