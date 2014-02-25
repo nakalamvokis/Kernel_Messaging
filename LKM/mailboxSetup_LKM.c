@@ -16,7 +16,12 @@
 #include <linux/kernel.h>
 #include <linux/module.h>
 #include <linux/syscalls.h>
+#include <linux/slab.h>
+#include <unistd.h>
 #include "mailbox.h"
+
+#define NUM_MAILBOXES 150
+#define MAILBOX_SIZE 20
 
 unsigned long **sys_call_table;
 
@@ -24,16 +29,176 @@ asmlinkage long (*ref_sys_cs3013_syscall1)(void);
 asmlinkage long (*ref_sys_cs3013_syscall2)(void);
 asmlinkage long (*ref_sys_cs3013_syscall3)(void);
 
+static mailbox mailbox_table[NUM_MAILBOXES];
+static struct kmem_cache kcache;
+ 
+// hash table functions
+/* function to initialize the table
+ * returns 0 on success or error message */
+int initMailbox()
+{
+	int i;
+	for (i = 0; i < NUM_MAILBOXES; i++)
+	{
+		mailbox_table[i].process_pid = -1;
+		mailbox_table[i].messages = NULL;
+		mailbox_table[i].count = 0;
+	}
+	num_mailboxes = 0;
+	return 0;
+}
+/* function to get locate mailbox in the mailbox hash table
+ * param pid -> process id of the process to recieve a message
+ * return i -> spot in hash table where mailbox is (returns MAILBOX_INVALID if mailbox is non existant)
+ * getMailbox(-1) returns the next free mailbox
+*/
+int getMailbox(pid_t pid)
+{
+	int i;
+	for(i = 0; i < NUM_MAILBOXES; i++)
+	{
+		if(mailbox_table[i].process_pid == pid)
+			return i;
+	}
+	return MAILBOX_INVALID;	
+}
+
+/* function to create new mailbox
+ * param pid -> pid of process to be assigned a mailbox
+ */
+void createMailbox(pid_t pid)
+{
+	int i;
+	struct mailbox new_mailbox;
+	new_mailbox.pid = pid;
+	new_mailbox.count = 0;
+	for (i = 0; i < NUM_MAILBOXES; i++)
+	{
+		if (mailbox_table[i].process_pid == -1)
+		{
+			mailbox_table[i] = new_mailbox;
+			break;
+		}
+	}
+	
+	return MAILBOX_ERROR;
+}
+
+/* function to delete a mailbox
+ * param pid -> process of mailbox to be deleted
+ * return i -> count in mailbox_table that was deleted
+ */
+int deleteMailbox(pid_t pid)
+{
+	int i;
+	for(i = 0; i < NUM_MAILBOXES; i++)
+	{
+		if (mailbox_table[i].process_pid == pid)
+		{
+			mailbox_table[i].process_pid = -1;
+			mailbox_table[i].count = 0;
+			flushMsg(pid);
+			return i;
+		}
+	}
+	return MAILBOX_INVALID;	
+}
+
+
+/** function to delete all messages in a mailbox
+ * param pid -> process of mailbox
+ * return 0 on success or error message */
+int flushMsg(pid_t pid)
+{
+	int m = getMailbox(pid);
+	int i, j;
+	
+	for (i = 0; i < MAILBOX_SIZE; i++)
+	{
+		for (j = 0; j < MAX_MSG_SIZE; j++)
+			mailbox_table[i].messages[j] = NULL;
+	}
+	
+	return 0;
+}
+
+
+
+int addMessage(*mailbox m, *message_info info)
+{
+	if (!(count == MAILBOX_SIZE))
+		return MAILBOX_ERROR;
+		
+	*m[count] = *info;
+	count++;	
+	return 0;
+}
+
+
+char* getMessage(*mailbox m, void *msg)
+{
+	int i;
+	for(i = 0; i < count; i++)
+	{
+		if((strcmp(*msg, m[i].msg) == 0)
+		{
+			return msg;
+		}
+	}
+	
+	return MAILBOX_ERROR;
+	
+}
+
+
+int deleteMessage(*mailbox m, void *msg)
+{
+	int i;
+	for(i = 0; i < count; i++)
+	{
+		if((strcmp(*msg, m[i].msg) == 0)
+		{
+			int j;
+			for(j = i; j < MAILBOX_SIZE - 1; j++)
+			{
+				m[j] = m[j+1];
+			}
+			return 0;
+		}
+	}
+	
+	return MAILBOX_ERROR;
+	
+}
+
+
+
 
 asmlinkage long sys_mailbox_send(struct send_info *info)
 {
-	struct send_info kinfo;
-
+	message_info kinfo;
+	pid_t pid = getpid();
+	
 	if(copy_from_user(&kinfo, info, sizeof(kinfo)))
-	{
-		return -EFAULT;
-	}
+		return MSG_ARG_ERROR;
+	
+	if(kinfo.block == TRUE)
+		return MAILBOX_STOPPED;
+		
+	if(kinfo.len > MAX_MSG_SIZE || kinfo.len < 0)
+		return MSG_LENGTH_ERROR;
 
+	if(getMailbox(kinfo.dest) == MAILBOX_INVALID)
+		return MAILBOX_INVALID
+	
+	if(getMailbox(pid) == MAILBOX_INVALID)
+		createMailbox(pid);
+	
+	mailbox m = mailbox_table[getMailbox(pid)];
+	
+	// add message to mailbox
+	addMessage(&m, &kinfo);
+	
 	return 0;
 }
 
@@ -41,12 +206,27 @@ asmlinkage long sys_mailbox_send(struct send_info *info)
 
 asmlinkage long sys_mailbox_rcv(struct rcv_info *info)
 {
-	struct rcv_info kinfo;
+	message_info kinfo;
+	pid_t pid = getpid();
+	
 
-	if(copy_from_user(&kinfo, info, sizeof(kinfo)))
-	{
-		return -EFAULT;
-	}
+	if (copy_from_user(&kinfo, info, sizeof(kinfo)))
+		return MSG_ARG_ERROR;
+
+	if (kinfo.block == TRUE)
+		return MAILBOX_STOPPED;
+
+	if (getMailbox(pid) == MAILBOX_INVALID)
+		createMailbox(pid);
+	
+	
+	mailbox m = mailbox_table[getMailbox(pid)];
+	
+	// return a message pointer
+	char* message = getMessage(&m, *msg);
+	
+	// delete message from mailbox
+	deleteMessage(&m, *msg);
 
 	return 0;
 }
@@ -57,13 +237,28 @@ asmlinkage long sys_mailbox_rcv(struct rcv_info *info)
 asmlinkage long sys_mailbox_manage(struct manage_info *info)
 {
 	struct manage_info kinfo;
-
+	pid_t pid = getpid();
+	
 	if(copy_from_user(&kinfo, info, sizeof(kinfo)))
 	{
-		return -EFAULT;
+		return MSG_ARG_ERROR;
 	}
+	
 
-
+	mailbox m = getMailbox(pid);
+	if (m == MAILBOX_INVALID)
+	{
+		createMailbox(pid);
+		m = getMailbox(pid);
+	}
+	m.stop = kinfo.stop;
+	kinfo.count = m.count;
+	
+	if(copy_to_user(info, &kinfo, sizeof(kinfo)))
+	{
+		return MSG_ARG_ERROR;
+	}
+	
 	return 0;
 }
 
@@ -126,7 +321,14 @@ static int __init interceptor_start(void)
 	sys_call_table[__NR_cs3013_syscall3] = (unsigned long *)sys_mailbox_manage;
 
 	enable_page_protection();
-
+	
+	/* Initialize the mailboxes */
+	if (!initMailbox())
+	{
+		//Couldn't init the mailboxes for some reason.
+		return -1;
+	}
+	kcache = kmem_cache_create("Mailboxes", sizeof(mailbox)*NUM_MAILBOXES, 0, 0, NULL);
 	/* And indicate the load was successful */
 	printk(KERN_INFO "Loaded interceptor!");
 

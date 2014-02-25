@@ -6,39 +6,44 @@
 * Modified for CS-3013, C-term 2012
 *
 */
-
 #ifndef __MAILBOX__
 #define __MAILBOX__
 
 #include <stdbool.h>
-#include <linux/types.h>
+#include <sys/types.h>
+#include <linux/spinlock.h>
 
 #define NO_BLOCK 0
 #define BLOCK   1
 #define MAX_MSG_SIZE 128
 
-
-struct send_info
+// mailbox structure to be used for each process receiving messages
+typedef struct mailbox
 {
+	pid_t process_pid;
+	spinlock_t mlock;
+	int count;
+	bool stop;
+	mesage_info messages[MAILBOX_SIZE];
+} mailbox;
+
+// struct to be passed as parameter for send and recieve message syscall
+typedef struct message_info
+{
+	pid_t *sender;
 	pid_t dest;
 	void *msg;
 	int len;
 	bool block;
-};
+} message_info;
 
-struct rcv_info
-{
-	pid_t *sender;
-	void *msg;
-	int *len;
-	bool block;
-};
 
-struct manage_info
+// struct to be passed as parameter for manage syscall
+typedef struct manage_info
 {
 	bool stop;
 	int *count;
-};
+} manage_info;
 
 
 /**
