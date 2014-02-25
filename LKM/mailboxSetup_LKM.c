@@ -16,6 +16,7 @@
 #include <linux/kernel.h>
 #include <linux/module.h>
 #include <linux/syscalls.h>
+#include <linux/slab.h>
 #include <unistd.h>
 #include "mailbox.h"
 
@@ -29,8 +30,9 @@ asmlinkage long (*ref_sys_cs3013_syscall2)(void);
 asmlinkage long (*ref_sys_cs3013_syscall3)(void);
 
 static mailbox mailbox_table[NUM_MAILBOXES];
-
-// hash table functions (may want to place in seperate file)
+static struct kmem_cache kcache;
+ 
+// hash table functions
 /* function to initialize the table
  * returns 0 on success or error message */
 int initMailbox()
@@ -326,6 +328,7 @@ static int __init interceptor_start(void)
 		//Couldn't init the mailboxes for some reason.
 		return -1;
 	}
+	kcache = kmem_cache_create("Mailboxes", sizeof(mailbox)*NUM_MAILBOXES, 0, 0, NULL);
 	/* And indicate the load was successful */
 	printk(KERN_INFO "Loaded interceptor!");
 

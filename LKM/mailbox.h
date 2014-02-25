@@ -11,6 +11,7 @@
 
 #include <stdbool.h>
 #include <sys/types.h>
+#include <linux/spinlock.h>
 
 #define NO_BLOCK 0
 #define BLOCK   1
@@ -20,6 +21,7 @@
 typedef struct mailbox
 {
 	pid_t process_pid;
+	spinlock_t mlock;
 	int count;
 	bool stop;
 	mesage_info messages[MAILBOX_SIZE];
