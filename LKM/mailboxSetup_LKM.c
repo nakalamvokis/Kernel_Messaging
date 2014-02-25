@@ -17,11 +17,53 @@
 #include <linux/module.h>
 #include <linux/syscalls.h>
 #include <linux/slab.h>
-#include <unistd.h>
-#include "mailbox.h"
+#include <linux/unistd.h>
+#include <linux/mailbox.h>
 
 #define NUM_MAILBOXES 150
 #define MAILBOX_SIZE 20
+
+// mailbox structure to be used for each process receiving messages
+typedef struct mailbox
+{
+	pid_t process_pid;
+	spinlock_t mlock;
+	int count;
+	bool block;
+	message_info messages[MAILBOX_SIZE];
+} mailbox;
+
+// struct to be passed as parameter for send and recieve message syscall
+typedef struct message_info
+{
+	pid_t *sender;
+	pid_t dest;
+	void *msg;
+	int len;
+	bool block;
+} message_info;
+
+
+// struct to be passed as parameter for manage syscall
+typedef struct manage_info
+{
+	bool stop;
+	int *count;
+} manage_info;
+
+
+typedef struct list_node
+{
+	mailbox* box;
+	pid_t pid;
+	list_node next_node;
+} list_node;
+
+
+typedef struct hash_table
+{
+	list_node **head;
+} hash_table;
 
 unsigned long **sys_call_table;
 
@@ -29,60 +71,55 @@ asmlinkage long (*ref_sys_cs3013_syscall1)(void);
 asmlinkage long (*ref_sys_cs3013_syscall2)(void);
 asmlinkage long (*ref_sys_cs3013_syscall3)(void);
 
-static mailbox mailbox_table[NUM_MAILBOXES];
 static struct kmem_cache kcache;
+static hash_table h;
  
-// hash table functions
-/* function to initialize the table
- * returns 0 on success or error message */
-int initMailbox()
-{
-	int i;
-	for (i = 0; i < NUM_MAILBOXES; i++)
-	{
-		mailbox_table[i].process_pid = -1;
-		mailbox_table[i].messages = NULL;
-		mailbox_table[i].count = 0;
-	}
-	num_mailboxes = 0;
-	return 0;
-}
-/* function to get locate mailbox in the mailbox hash table
- * param pid -> process id of the process to recieve a message
- * return i -> spot in hash table where mailbox is (returns MAILBOX_INVALID if mailbox is non existant)
- * getMailbox(-1) returns the next free mailbox
-*/
-int getMailbox(pid_t pid)
-{
-	int i;
-	for(i = 0; i < NUM_MAILBOXES; i++)
-	{
-		if(mailbox_table[i].process_pid == pid)
-			return i;
-	}
-	return MAILBOX_INVALID;	
-}
+// HASH TABLE FUNCTIONS
 
 /* function to create new mailbox
  * param pid -> pid of process to be assigned a mailbox
  */
-void createMailbox(pid_t pid)
+int createMailbox(pid_t pid)
 {
-	int i;
-	struct mailbox new_mailbox;
+	mailbox* mailbox_ptr;
+	mailbox new_mailbox = kmem_cache_alloc(&kcache, GFP_KERNEL);
 	new_mailbox.pid = pid;
 	new_mailbox.count = 0;
-	for (i = 0; i < NUM_MAILBOXES; i++)
+
+	mailbox_ptr = h.head;
+	while(mailbox_ptr != NULL)
 	{
-		if (mailbox_table[i].process_pid == -1)
-		{
-			mailbox_table[i] = new_mailbox;
-			break;
-		}
+		mailbox_ptr = mailbox_ptr->next_node;
 	}
-	
-	return MAILBOX_ERROR;
+
+	mailbox_ptr = &new_mailbox;
+
+	return 0;
 }
+
+
+
+/* function to get mailbox in the mailbox hash table
+ * param pid -> process id of the process to recieve a message
+ * getMailbox(-1) returns the next free mailbox
+*/
+mailbox* getMailbox(pid_t pid)
+{
+	mailbox* mailbox_ptr;
+	mailbox_ptr = h.head;
+
+	while(mailbox_ptr->pid != pid)
+	{
+		if (mailbox_ptr == NULL)
+		{
+			return MAILBOX_INVALID;
+		}
+		mailbox_ptr = mailbox_ptr->next_node;
+	}
+
+	return mailbox_ptr;
+}
+
 
 /* function to delete a mailbox
  * param pid -> process of mailbox to be deleted
@@ -168,7 +205,6 @@ int deleteMessage(*mailbox m, void *msg)
 	}
 	
 	return MAILBOX_ERROR;
-	
 }
 
 
@@ -328,7 +364,7 @@ static int __init interceptor_start(void)
 		//Couldn't init the mailboxes for some reason.
 		return -1;
 	}
-	kcache = kmem_cache_create("Mailboxes", sizeof(mailbox)*NUM_MAILBOXES, 0, 0, NULL);
+	kcache = kmem_cache_create("Mailboxes", sizeof(mailbox), 0, 0, NULL);
 	/* And indicate the load was successful */
 	printk(KERN_INFO "Loaded interceptor!");
 
