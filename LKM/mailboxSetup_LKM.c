@@ -81,18 +81,18 @@ static hash_table h;
  */
 int createMailbox(pid_t pid)
 {
-	mailbox* mailbox_ptr;
+	list_node* node_ptr;
 	mailbox new_mailbox = kmem_cache_alloc(&kcache, GFP_KERNEL);
 	new_mailbox.pid = pid;
 	new_mailbox.count = 0;
 
-	mailbox_ptr = h.head;
-	while(mailbox_ptr != NULL)
+	node_ptr = h.head;
+	while(node_ptr != NULL)
 	{
-		mailbox_ptr = mailbox_ptr->next_node;
+		node_ptr = node_ptr->next_node;
 	}
 
-	mailbox_ptr = &new_mailbox;
+	node_ptr->box = &new_mailbox;
 
 	return 0;
 }
@@ -106,18 +106,19 @@ int createMailbox(pid_t pid)
 mailbox* getMailbox(pid_t pid)
 {
 	mailbox* mailbox_ptr;
-	mailbox_ptr = h.head;
+	list_node* node_ptr;
+	node_ptr = h.head;
 
-	while(mailbox_ptr->pid != pid)
+	while(node_ptr->pid != pid)
 	{
-		if (mailbox_ptr == NULL)
+		if (node_ptr == NULL)
 		{
-			return MAILBOX_INVALID;
+			return NULL;
 		}
-		mailbox_ptr = mailbox_ptr->next_node;
+		node_ptr = node_ptr->next_node;
 	}
 
-	return mailbox_ptr;
+	return node_ptr->box;
 }
 
 
@@ -127,38 +128,28 @@ mailbox* getMailbox(pid_t pid)
  */
 int deleteMailbox(pid_t pid)
 {
-	int i;
-	for(i = 0; i < NUM_MAILBOXES; i++)
+	mailbox* m = getMailbox(pid);
+	list_node* node_ptr;
+	node_ptr = h.head;
+
+	if (m == NULL)
 	{
-		if (mailbox_table[i].process_pid == pid)
+		return MAILBOX_INVALID;
+	}
+	kmem_free(m);
+
+	while(node_ptr != NULL)
+	{
+		if (node_ptr->next_node->pid == pid)
 		{
-			mailbox_table[i].process_pid = -1;
-			mailbox_table[i].count = 0;
-			flushMsg(pid);
-			return i;
+			node_ptr->next_node == node_ptr->next_node->next_node;
+			return 0;
 		}
+		nodeptr = nodeptr->next_node;
 	}
-	return MAILBOX_INVALID;	
+
+	return MAILBOX_INVALID
 }
-
-
-/** function to delete all messages in a mailbox
- * param pid -> process of mailbox
- * return 0 on success or error message */
-int flushMsg(pid_t pid)
-{
-	int m = getMailbox(pid);
-	int i, j;
-	
-	for (i = 0; i < MAILBOX_SIZE; i++)
-	{
-		for (j = 0; j < MAX_MSG_SIZE; j++)
-			mailbox_table[i].messages[j] = NULL;
-	}
-	
-	return 0;
-}
-
 
 
 int addMessage(*mailbox m, *message_info info)
