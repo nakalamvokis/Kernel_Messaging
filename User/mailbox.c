@@ -11,7 +11,6 @@
 long SendMsg(pid_t dest, void *msg, int len, bool block)
 {
 	message_info info;
-	
 	info.dest = dest;
 	info.msg = msg;
 	info.len = len;
