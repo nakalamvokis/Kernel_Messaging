@@ -1,7 +1,6 @@
 
 
 
-
 /* function to send a message to another running process (using syscalls)
  * param dest -> process ID of recipient
  * param *msg -> uninterpreted array of bytes (message)
@@ -11,6 +10,7 @@
 long SendMsg(pid_t dest, void *msg, int len, bool block)
 {
 	message_info info;
+	
 	info.dest = dest;
 	info.msg = msg;
 	info.len = len;
