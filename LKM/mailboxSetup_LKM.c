@@ -115,8 +115,8 @@ int createMailbox(pid_t pid)
 
 /* function to get mailbox in the mailbox hash table
  * param pid -> process id of the process to recieve a message
- * getMailbox(-1) returns the next free mailbox
-*/
+ * return a pointer to a mailbox
+ */
 mailbox* getMailbox(pid_t pid)
 {
 	list_node* node_ptr;
@@ -137,7 +137,6 @@ mailbox* getMailbox(pid_t pid)
 
 /* function to delete a mailbox
  * param pid -> process of mailbox to be deleted
- * return i -> count in mailbox_table that was deleted
  */
 int deleteMailbox(pid_t pid)
 {
@@ -168,6 +167,11 @@ int deleteMailbox(pid_t pid)
 
 // MAILBOX FUNCTIONS
 
+
+/* function to add a mailbox to the hash table
+ * param m -> mailbox to receive message
+ * param info -> message to add to mailbox
+ */
 int addMessage(mailbox* m, message_info* info)
 {
 	if(m->count == MAILBOX_SIZE)
@@ -181,6 +185,10 @@ int addMessage(mailbox* m, message_info* info)
 }
 
 
+/* function to get a message from a mailbox
+ * param m -> mailbox to recieve message
+ * return a pointer to a message_info struct
+ */
 message_info* getMessage(mailbox* m)
 {
 	if(m->count == 0)
@@ -191,7 +199,9 @@ message_info* getMessage(mailbox* m)
 	return &(m->messages[0]);
 }
 
-
+/* function to delete a message
+ * param m -> mailbox to be edited
+ */
 int deleteMessage(mailbox* m)
 {
 	int i;
