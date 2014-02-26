@@ -19,7 +19,10 @@
 #include <linux/slab.h>
 #include <linux/unistd.h>
 #include <linux/mailbox.h>
-//#include <sys/types.h>
+#include <linux/types.h>
+#include <linux/pid.h>
+#include <linux/spinlock.h>
+
 
 #define MAILBOX_SIZE 20
 
