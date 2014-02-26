@@ -389,6 +389,8 @@ static void __exit interceptor_end(void)
 	sys_call_table[__NR_cs3013_syscall3] = (unsigned long *)ref_sys_cs3013_syscall3;
 	enable_page_protection();
 
+	kmem_cache_destroy(kcache)
+	
 	printk(KERN_INFO "Unloaded interceptor!");
 }	// static void __exit interceptor_end(void)
 
