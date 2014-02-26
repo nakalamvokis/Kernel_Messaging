@@ -1,5 +1,5 @@
-all: mailbox.c mailbox.h
-	gcc mailbox.c mailbox.h -o mailbox
+mailbox.o: mailbox.c mailbox.h
+	gcc mailbox.c mailbox.h -c
 
 clean:
-	rm mailbox
+	rm *.o
