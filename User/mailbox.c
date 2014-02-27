@@ -3,9 +3,9 @@
 #include <sys/types.h>
 #include "mailbox.h"
 
-#define __NR_cs3013_syscall1	349
-#define __NR_cs3013_syscall2	350
-#define __NR_cs3013_syscall3	351
+#define __NR_cs3013_syscall1 349
+#define __NR_cs3013_syscall2 350
+#define __NR_cs3013_syscall3 351
 
 // struct to be passed as parameter for send and recieve message syscall
 typedef struct message_info
@@ -14,6 +14,7 @@ typedef struct message_info
 	pid_t dest;
 	void *msg;
 	int len;
+	int* lenPtr;
 	bool block;
 } message_info;
 
@@ -42,7 +43,7 @@ long SendMsg(pid_t dest, void *msg, int len, bool block)
 	info.len = len;
 	info.block = block;
 	
-	return (cs3013_syscall1, &info);
+	return syscall(__NR_cs3013_syscall1, &info);
 }
 
 
@@ -59,10 +60,10 @@ long RcvMsg(pid_t *sender, void *msg, int *len, bool block)
 	
 	info.sender = sender;
 	info.msg = msg;
-	info.len = len;
+	info.lenPtr = len;
 	info.block = block;
 	
-	return (cs3013_syscall2, &info);
+	return syscall(__NR_cs3013_syscall2, &info);
 }
 
 
@@ -79,5 +80,5 @@ long ManageMailbox(bool stop, int *count)
 	info.stop = stop;
 	info.count = count;
 	
-	return (cs3013_syscall3, &info);
+	return syscall(__NR_cs3013_syscall3, &info);
 }
