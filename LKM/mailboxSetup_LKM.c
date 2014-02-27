@@ -185,6 +185,9 @@ int addMessage(mailbox* m, message_info* info)
 	}
 
 	m->messages[m->count] = *info;
+	
+	printk("Added a message: %s\n", (char *) m->messages[m->count].msg);
+	
 	m->count++;
 	return 0;
 }
@@ -200,6 +203,8 @@ message_info* getMessage(mailbox* m)
 	{
 		return NULL;
 	}
+	
+	printk("Got a message: %s\n", (char *) m->messages[0].msg);
 
 	return &(m->messages[0]);
 }
@@ -209,12 +214,14 @@ message_info* getMessage(mailbox* m)
  */
 int deleteMessage(mailbox* m)
 {
+	printk("Deleted a message: %s\n", (char *) m->messages[0].msg);
 	int i;
 	for(i = 0; i < m->count; i++)
 	{
 		m->messages[i] = m->messages[i+1];
 	}
 	m->count--;
+	
 	return 0;
 }
 
@@ -247,6 +254,8 @@ asmlinkage long sys_mailbox_send(struct message_info *info)
 	// add message to mailbox
 	addMessage(m, &kinfo);
 	
+	printk("Sent a message: %s\n", (char *) kinfo->messages[0].msg);
+	
 	return 0;
 }
 
@@ -278,6 +287,8 @@ asmlinkage long sys_mailbox_rcv(struct message_info *info)
 	{
 		return MAILBOX_ERROR;
 	}
+	
+	printk("Recieved a message: %s\n", (char *) kinfo->messages[0].msg);
 	
 	// delete sent message from mailbox
 	deleteMessage(m);
