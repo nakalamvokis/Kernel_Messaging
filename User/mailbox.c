@@ -1,4 +1,26 @@
 
+#include <unistd.h>
+#include <sys/types.h>
+
+
+// struct to be passed as parameter for send and recieve message syscall
+typedef struct message_info
+{
+	pid_t *sender;
+	pid_t dest;
+	void *msg;
+	int len;
+	bool block;
+} message_info;
+
+// struct to be passed as parameter for manage syscall
+typedef struct manage_info
+{
+	pid_t pid;
+	bool stop;
+	int *count;
+} manage_info;
+
 
 
 /* function to send a message to another running process (using syscalls)
@@ -10,7 +32,7 @@
 long SendMsg(pid_t dest, void *msg, int len, bool block)
 {
 	message_info info;
-	
+	*(info.sender) = getpid();
 	info.dest = dest;
 	info.msg = msg;
 	info.len = len;
@@ -49,7 +71,7 @@ long RcvMsg(pid_t *sender, void *msg, int *len, bool block)
 long ManageMailbox(bool stop, int *count)
 {
 	struct manage_info info;
-	
+	info.pid = getpid();
 	info.stop = stop;
 	info.count = count;
 	
