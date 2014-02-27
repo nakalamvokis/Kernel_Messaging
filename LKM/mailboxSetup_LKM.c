@@ -75,7 +75,8 @@ asmlinkage long (*ref_sys_cs3013_syscall1)(void);
 asmlinkage long (*ref_sys_cs3013_syscall2)(void);
 asmlinkage long (*ref_sys_cs3013_syscall3)(void);
 
-static struct kmem_cache* kcache;
+static struct kmem_cache* mcache;
+static struct kmem_cache* lcache;
 static hash_table h;
  
 int createMailbox(pid_t pid);
@@ -95,8 +96,8 @@ int deleteMessage(mailbox* m);
  */
 int createMailbox(pid_t pid)
 {
-	list_node* node_ptr;
-	mailbox* new_mailbox = kmem_cache_alloc(kcache, GFP_KERNEL);
+	list_node* node_ptr = kmem_cache_alloc(lcache, GFP_KERNEL);
+	mailbox* new_mailbox = kmem_cache_alloc(mcache, GFP_KERNEL);
 	new_mailbox->pid = pid;
 	new_mailbox->count = 0;
 
@@ -143,24 +144,27 @@ int deleteMailbox(pid_t pid)
 	mailbox* m = getMailbox(pid);
 	list_node* node_ptr;
 	node_ptr = h.head;
-
+	list_node* oldnode;
+	
 	if (m == NULL)
 	{
 		return MAILBOX_INVALID;
 	}
 
-	kmem_cache_free(kcache,m);
+	kmem_cache_free(mcache,m);
 
 	while(node_ptr != NULL)
 	{
 		if (node_ptr->next_node->pid == pid)
 		{
+			oldnode = node_ptr->next_node;
 			node_ptr->next_node = node_ptr->next_node->next_node;
+			kmem_cache_free(lcache, oldnode);
 			return 0;
 		}
 		node_ptr = node_ptr->next_node;
 	}
-
+	
 	return MAILBOX_INVALID;
 }
 
@@ -368,7 +372,9 @@ static int __init interceptor_start(void)
 
 	enable_page_protection();
 	
-	kcache = kmem_cache_create("Mailboxes", sizeof(mailbox), 0, 0, NULL);
+	mcache = kmem_cache_create("Mailboxes", sizeof(mailbox), 0, 0, NULL);
+	lcache = kmem_cache_create("Hash Tables Entries", sizeof(list_node), 0, 0, NULL);
+	
 	/* And indicate the load was successful */
 	printk(KERN_INFO "Loaded interceptor!");
 
@@ -389,7 +395,8 @@ static void __exit interceptor_end(void)
 	sys_call_table[__NR_cs3013_syscall3] = (unsigned long *)ref_sys_cs3013_syscall3;
 	enable_page_protection();
 
-	kmem_cache_destroy(kcache)
+	kmem_cache_destroy(mcache);
+	kmem_cache_destroy(lcache);
 	
 	printk(KERN_INFO "Unloaded interceptor!");
 }	// static void __exit interceptor_end(void)
