@@ -1,7 +1,7 @@
 
 #include <unistd.h>
 #include <sys/types.h>
-
+#include <mailbox.h>
 
 // struct to be passed as parameter for send and recieve message syscall
 typedef struct message_info
