@@ -5,19 +5,19 @@
  *      Author: Nicholas Kalamvokis and Etienne Scraire
  */
 
-
 #undef __KERNEL__
 #undef MODULE
 
 #define __KERNEL__
 #define MODULE
 
+
 #include <linux/kernel.h>
 #include <linux/module.h>
 #include <linux/syscalls.h>
 #include <linux/slab.h>
 #include <linux/unistd.h>
-#include <linux/mailbox.h>
+#include <mailbox.h>
 #include <linux/types.h>
 #include <linux/pid.h>
 #include <linux/spinlock.h>
@@ -35,6 +35,14 @@ typedef struct message_info
 	bool block;
 } message_info;
 
+// struct to be passed as parameter for manage syscall
+typedef struct manage_info
+{
+	pid_t pid;
+	bool stop;
+	int *count;
+} manage_info;
+
 
 // mailbox structure to be used for each process receiving messages
 typedef struct mailbox
@@ -45,14 +53,6 @@ typedef struct mailbox
 	bool stop;
 	message_info messages[MAILBOX_SIZE];
 } mailbox;
-
-
-// struct to be passed as parameter for manage syscall
-typedef struct manage_info
-{
-	bool stop;
-	int *count;
-} manage_info;
 
 
 typedef struct list_node
@@ -223,13 +223,13 @@ asmlinkage long sys_mailbox_send(struct message_info *info)
 {
 	message_info kinfo;
 	mailbox* m;
-	pid_t pid = kinfo.dest;
-
-	*(kinfo.sender) = getpid();
+	pid_t pid;
 	
 	if(copy_from_user(&kinfo, info, sizeof(kinfo)))
 		return MSG_ARG_ERROR;
 	
+	pid = kinfo.dest;
+
 	if(kinfo.block == true)
 		return MAILBOX_STOPPED;
 		
@@ -255,19 +255,19 @@ asmlinkage long sys_mailbox_send(struct message_info *info)
 asmlinkage long sys_mailbox_rcv(struct message_info *info)
 {
 	message_info kinfo;
-	pid_t pid = getpid();
+	pid_t pid;
 	mailbox* m;
 	
-
 	if (copy_from_user(&kinfo, info, sizeof(kinfo)))
 		return MSG_ARG_ERROR;
+
+	pid = *(kinfo.sender);
 
 	if (kinfo.block == true)
 		return MAILBOX_STOPPED;
 
 	if (getMailbox(pid) == NULL)
 		createMailbox(pid);
-	
 	
 	m = getMailbox(pid);
 	
@@ -291,14 +291,18 @@ asmlinkage long sys_mailbox_rcv(struct message_info *info)
 asmlinkage long sys_mailbox_manage(struct manage_info *info)
 {
 	struct manage_info kinfo;
-	pid_t pid = getpid();
+	pid_t pid;
 	mailbox* m;
 	
+
+
 	if(copy_from_user(&kinfo, info, sizeof(kinfo)))
 	{
 		return MSG_ARG_ERROR;
 	}
 	
+	pid = kinfo.pid;
+
 
 	m = getMailbox(pid);
 
