@@ -6,7 +6,6 @@
  */
 
 
-
 #undef __KERNEL__
 #undef MODULE
 
@@ -143,9 +142,11 @@ int deleteMailbox(pid_t pid)
 {
 	mailbox* m = getMailbox(pid);
 	list_node* node_ptr;
-	node_ptr = h.head;
 	list_node* oldnode;
+
+	node_ptr = h.head;
 	
+
 	if (m == NULL)
 	{
 		return MAILBOX_INVALID;
@@ -221,7 +222,9 @@ int deleteMessage(mailbox* m)
 asmlinkage long sys_mailbox_send(struct message_info *info)
 {
 	message_info kinfo;
+	mailbox* m;
 	pid_t pid = kinfo.dest;
+
 	*(kinfo.sender) = getpid();
 	
 	if(copy_from_user(&kinfo, info, sizeof(kinfo)))
@@ -239,7 +242,7 @@ asmlinkage long sys_mailbox_send(struct message_info *info)
 	if(getMailbox(*(kinfo.sender)) == NULL)
 		createMailbox(*(kinfo.sender));
 	
-	mailbox* m = getMailbox(pid);
+	m = getMailbox(pid);
 	
 	// add message to mailbox
 	addMessage(m, &kinfo);
@@ -253,6 +256,7 @@ asmlinkage long sys_mailbox_rcv(struct message_info *info)
 {
 	message_info kinfo;
 	pid_t pid = getpid();
+	mailbox* m;
 	
 
 	if (copy_from_user(&kinfo, info, sizeof(kinfo)))
@@ -265,7 +269,7 @@ asmlinkage long sys_mailbox_rcv(struct message_info *info)
 		createMailbox(pid);
 	
 	
-	mailbox* m = getMailbox(pid);
+	m = getMailbox(pid);
 	
 	// get a message_info
 	kinfo = *(getMessage(m));
@@ -288,6 +292,7 @@ asmlinkage long sys_mailbox_manage(struct manage_info *info)
 {
 	struct manage_info kinfo;
 	pid_t pid = getpid();
+	mailbox* m;
 	
 	if(copy_from_user(&kinfo, info, sizeof(kinfo)))
 	{
@@ -295,7 +300,8 @@ asmlinkage long sys_mailbox_manage(struct manage_info *info)
 	}
 	
 
-	mailbox* m = getMailbox(pid);
+	m = getMailbox(pid);
+
 	if (m == NULL)
 	{
 		createMailbox(pid);
