@@ -17,11 +17,11 @@ int main() {
   if(childPID == 0){
     void *msg[128];
     int len;
-    
     if(status= RcvMsg(&sender,msg,&len,false))
 		printf("ERROR: %d\n", status);
+	else {
     printf("Message received.\n");
-    printf("Message: %s\n", (char *) msg);
+    printf("Message: %s\n", (char *) msg);}
   }
   else{
     char mesg[] = "I am your father";

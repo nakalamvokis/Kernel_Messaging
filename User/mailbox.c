@@ -1,6 +1,7 @@
 #include <syscall.h>
 #include <unistd.h>
 #include <sys/types.h>
+#include <stdio.h>
 #include "mailbox.h"
 
 #define __NR_cs3013_syscall1 349
@@ -42,7 +43,7 @@ long SendMsg(pid_t dest, void *msg, int len, bool block)
 	info.msg = msg;
 	info.len = len;
 	info.block = block;
-	
+	printf("Sending message %s, to dest %d from pid %d!\n", (char *) info.msg, info.dest, *info.sender);
 	return syscall(__NR_cs3013_syscall1, &info);
 }
 
