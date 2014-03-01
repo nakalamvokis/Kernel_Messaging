@@ -75,7 +75,7 @@ long RcvMsg(pid_t *sender, void *msg, int *len, bool block)
  */
 long ManageMailbox(bool stop, int *count)
 {
-	struct manage_info info;
+	manage_info info;
 	info.pid = getpid();
 	info.stop = stop;
 	info.count = count;
