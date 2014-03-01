@@ -5,11 +5,13 @@ int main()
 {
 	pid_t parent;
 	parent = getpid();
-	int status;
+	int status, count;
 	int childPID = fork();
 
 	if(childPID == 0) 
 	{
+		ManageMailbox(false, &count);
+		sleep(1);
 		char mesg[] = "I am your child!";
 		status = SendMsg(childPID, mesg, 17, false);
 		if (status)
@@ -21,8 +23,10 @@ int main()
 	{
 		pid_t child;
 		void *msg[128];
-		int len, count;
+		int len;
+		
 		ManageMailbox(false, &count);
+		sleep(1);
 		status = RcvMsg(&child, msg, &len, false);
 		if (status)
 			printf("RcvMsg failed with error status: %d\n", status);
