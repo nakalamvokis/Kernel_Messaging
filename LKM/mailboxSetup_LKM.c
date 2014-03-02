@@ -143,10 +143,17 @@ mailbox* getMailbox(pid_t pid)
 	{
 		printk("Head is null\n");
 		return NULL;
+<<<<<<< HEAD
 	}
 		
 	printk("Head is not null\n");
 		
+=======
+		
+		
+	// ISSUE HAPPENS BETWEEN HERE
+	
+>>>>>>> 731405bd7e717afd1c6f591b6b689bffba2f9d5f
 	while(node_ptr->pid != pid)
 	{
 		printk("Checking node pids\n");
@@ -159,7 +166,16 @@ mailbox* getMailbox(pid_t pid)
 	    node_ptr = node_ptr->next_node;
 	}
 
+<<<<<<< HEAD
 	printk("Theres are %d messages in this box", node_ptr->box->count);
+=======
+	printk("There are %d messages in this box", node_ptr->box->count);
+
+	// AND HERE
+	// TORUBLE MAKING MORE THAN ONE MAILBOX IN FORK PROGRAM
+	// MANAGE MAILBOX FIRST CALLS GETMAILBOX
+
+>>>>>>> 731405bd7e717afd1c6f591b6b689bffba2f9d5f
 
 	return node_ptr->box;
 }
