@@ -8,25 +8,6 @@
 #define __NR_cs3013_syscall2 350
 #define __NR_cs3013_syscall3 351
 
-// struct to be passed as parameter for send and recieve message syscall
-typedef struct message_info
-{
-	pid_t *sender;
-	pid_t dest;
-	void *msg;
-	int len;
-	int* lenPtr;
-	bool block;
-} message_info;
-
-// struct to be passed as parameter for manage syscall
-typedef struct manage_info
-{
-	bool stop;
-	int *count;
-} manage_info;
-
-
 
 /* function to send a message to another running process (using syscalls)
  * param dest -> process ID of recipient
@@ -36,14 +17,7 @@ typedef struct manage_info
  */
 long SendMsg(pid_t dest, void *msg, int len, bool block)
 {
-	message_info info;
-	info.dest = dest;
-	info.msg = msg;
-	info.len = len;
-	info.block = block;
-	printf("Sending message %s, to dest %d!\n", (char *) info.msg, info.dest);
-	 
-	return syscall(__NR_cs3013_syscall1, &info);
+	return syscall(__NR_cs3013_syscall1, dest, msg, len, block);
 }
 
 
@@ -56,18 +30,7 @@ long SendMsg(pid_t dest, void *msg, int len, bool block)
  */
 long RcvMsg(pid_t *sender, void *msg, int *len, bool block)
 {
-	message_info info;
-	
-	
-	info.block = block;
-	
-	int status = syscall(__NR_cs3013_syscall2, &info);
-	
-	sender = info.sender;
-	msg = info.msg;
-	len = info.lenPtr;
-	
-	return status;
+	return syscall(__NR_cs3013_syscall2, sender, msg, len, block);
 }
 
 
@@ -79,9 +42,5 @@ long RcvMsg(pid_t *sender, void *msg, int *len, bool block)
  */
 long ManageMailbox(bool stop, int *count)
 {
-	manage_info info;
-	info.stop = stop;
-	int status = syscall(__NR_cs3013_syscall3, &info);
-	count = info.count;
-	return status;
+	return syscall(__NR_cs3013_syscall3, stop, count);
 }

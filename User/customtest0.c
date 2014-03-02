@@ -8,7 +8,7 @@ int main()
 	pid_t sender = 0;
 	pid = getpid();
 	char mesg[] = "Test Message";
-	void* msg[128];
+	void *msg[128];
 	
 	status = SendMsg(pid, mesg, 13, false);
 	if (status)

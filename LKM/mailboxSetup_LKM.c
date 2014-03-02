@@ -13,6 +13,7 @@
 
 
 #include <linux/kernel.h>
+#include <asm/current.h>
 #include <linux/module.h>
 #include <linux/syscalls.h>
 #include <linux/slab.h>
@@ -28,21 +29,11 @@
 // struct to be passed as parameter for send and recieve message syscall
 typedef struct message_info
 {
-	pid_t *sender;
+	pid_t sender;
 	pid_t dest;
-	void *msg;
+	char* msg;
 	int len;
-	int* lenPtr;
-	bool block;
 } message_info;
-
-// struct to be passed as parameter for manage syscall
-typedef struct manage_info
-{
-	pid_t pid;
-	bool stop;
-	int *count;
-} manage_info;
 
 
 // mailbox structure to be used for each process receiving messages
@@ -77,6 +68,7 @@ asmlinkage long (*ref_sys_cs3013_syscall3)(void);
 
 static struct kmem_cache* mcache;
 static struct kmem_cache* lcache;
+
 static hash_table h;
  
 int createMailbox(pid_t pid);
@@ -96,27 +88,29 @@ int deleteMessage(mailbox* m);
  */
 int createMailbox(pid_t pid)
 {
-	list_node* node_ptr = kmem_cache_alloc(lcache, GFP_KERNEL);
+	list_node* node_ptr;
+	list_node* new_node = kmem_cache_alloc(lcache, GFP_KERNEL);
 	mailbox* new_mailbox = kmem_cache_alloc(mcache, GFP_KERNEL);
-	node_ptr->pid = pid;
-	node_ptr->next_node = NULL;
+	
+	if (h.head == NULL)
+		h.head = new_node;
+	else 
+	{
+		node_ptr = h.head;
+		while(node_ptr->next_node != NULL)
+		{
+			node_ptr = node_ptr->next_node;
+		}
+		node_ptr->next_node = new_node;
+	}
 	
 	new_mailbox->pid = pid;
 	new_mailbox->count = 0;
 	new_mailbox->stop = false;
 	
-	if (h.head == NULL)
-		h.head = node_ptr;
-	else 
-	{
-		node_ptr = h.head;
-		while(node_ptr != NULL)
-		{
-		node_ptr = node_ptr->next_node;
-		}
-	}
-
-	node_ptr->box = new_mailbox;
+	new_node->box = new_mailbox;
+	new_node->pid = pid;
+	new_node->next_node = NULL;
 
 	return 0;
 }
@@ -188,20 +182,23 @@ int deleteMailbox(pid_t pid)
  * param info -> message to add to mailbox
  */
 int addMessage(mailbox* m, message_info* info)
-{
+{	
+	message_info new_message;
+	
 	if(m->count == MAILBOX_SIZE)
 	{
 		return MAILBOX_FULL;
 	}
 
-	m->messages[m->count] = *info;
+	new_message = *info;
+
+	m->messages[m->count] = new_message;
 	
 	printk("Added a message: %s\n", (char *) m->messages[m->count].msg);
 	
 	m->count++;
 	return 0;
 }
-
 
 /* function to get a message from a mailbox
  * param m -> mailbox to recieve message
@@ -227,6 +224,7 @@ int deleteMessage(mailbox* m)
 	int i;
 	
 	printk("Deleted a message: %s\n", (char *) m->messages[0].msg);
+	
 	for(i = 0; i < m->count; i++)
 	{
 		m->messages[i] = m->messages[i+1];
@@ -237,118 +235,196 @@ int deleteMessage(mailbox* m)
 }
 
 
-asmlinkage long sys_mailbox_send(struct message_info *info)
+asmlinkage long sys_mailbox_send(pid_t dest, void *msg, int len, bool block)
 {
-	message_info kinfo;
 	mailbox* m;
-	pid_t pid;
+	pid_t pid;/*, send_dest;
+	void *send_msg;
+	int send_len;
+	bool send_block;
+	unsigned long status;*/
 	
-	if(copy_from_user(&kinfo, info, sizeof(kinfo)))
+	message_info new_message;
+	
+	printk("dest: %d, msg: %s, len: %d  \n", dest, (char *)msg, len);
+	
+	
+	
+	
+	pid = current->pid;
+
+
+	/*
+	if((status = copy_from_user(&send_dest, &dest, sizeof())))
+	{
+		printk("Made it past dest test %lu,  %d!\n", status, send_dest);
+		return MSG_ARG_ERROR;
+	}
+		
+	printk("Made it past dest test!\n");
+		
+	if(copy_from_user(send_msg, msg, sizeof(void *)))
 		return MSG_ARG_ERROR;
 		
+	printk("Made it past msg test!\n");
+		
+	if(copy_from_user(&send_len, &len, sizeof(len)))
+		return MSG_ARG_ERROR;
+		
+	printk("Made it past len test!\n");
+	
+	if(copy_from_user(&send_block, &block, sizeof(bool)))
+		return MSG_ARG_ERROR;
+		
+	printk("Made it past block test!\n");*/
+		
+	if (getMailbox(pid) == NULL)
+	{
+		createMailbox(pid);
+		printk("Created mailbox for process %d!", pid);
+	}
+	
 	printk(KERN_INFO "Started sending!\n");
-	pid = kinfo.dest;
 
-	if(kinfo.block == true)
+	if(block == true)
 		return MAILBOX_STOPPED;
 	printk(KERN_INFO "Mailbox not stopped!\n");
-	if(kinfo.len > MAX_MSG_SIZE || kinfo.len < 0)
+	
+	if(len > MAX_MSG_SIZE || len < 0)
 		return MSG_LENGTH_ERROR;
 	printk(KERN_INFO "Message of right size.");
-	if(getMailbox(pid) == NULL)
-		return MAILBOX_INVALID;
-	printk(KERN_INFO "Mailbox valid!\n");
 	
-	if(getMailbox(*(kinfo.sender)) == NULL)
-		createMailbox(*(kinfo.sender));
+	if(getMailbox(dest) == NULL)
+		return MAILBOX_INVALID;
+	
+	printk(KERN_INFO "Mailbox valid!\n");
 	
 	m = getMailbox(pid);
 	if (m == NULL)
 		printk(KERN_INFO "m is NULL!\n");
-	printk("Sent a message: %s\n", (char *) kinfo.msg);
-	// add message to mailbox
-	addMessage(m, &kinfo);
 	
+	new_message.dest = dest;
+	new_message.len = len;
+	new_message.msg = (char *) msg;
+	new_message.sender = pid;
 	
+	addMessage(m, &new_message);
+	printk("Sent a message: %s\n", (char *) m->messages[0].msg);
 	
 	return 0;
 }
 
 
 
-asmlinkage long sys_mailbox_rcv(struct message_info *info)
+asmlinkage long sys_mailbox_rcv(pid_t *sender, void *msg, int *len, bool block)
 {
-	message_info kinfo;
 	pid_t pid;
 	mailbox* m;
-	
-	if (copy_from_user(&kinfo, info, sizeof(kinfo)))
+	/*
+	pid_t rcv_sender;
+	void *rcv_msg = (void *) "Uninitialized message";
+	int rcv_len;
+	bool rcv_block;*/
+	message_info *rcv_message;
+	char* mesg;
+	/*
+	if(copy_from_user(&rcv_sender, sender, sizeof(pid_t)))
 		return MSG_ARG_ERROR;
-	printk(KERN_INFO "Started receiving!\n");
-	pid = *(kinfo.sender);
+		
+	if(copy_from_user(rcv_msg, msg, sizeof(void *)))
+		return MSG_ARG_ERROR;
+		
+	if(copy_from_user(&rcv_len, len, sizeof(int)))
+		return MSG_ARG_ERROR;
+	
+	if(copy_from_user(&rcv_block, &block, sizeof(bool)))
+		return MSG_ARG_ERROR;
+	*/
+	pid = current->pid;
+		
+	if (getMailbox(pid) == NULL)
+	{
+		createMailbox(pid);
+		printk("Created mailbox for process %d!", pid);
+	}
 
-	if (kinfo.block == true)
+	printk(KERN_INFO "Started receiving!\n");
+
+	if (block == true)
 		return MAILBOX_STOPPED;
 	printk(KERN_INFO "Mailbox not stopped!\n");
-	if (getMailbox(*kinfo.sender) == NULL)
-		return MAILBOX_INVALID;
-	printk(KERN_INFO "Sender exists!\n");
-	if (getMailbox(pid) == NULL)
-		createMailbox(pid);
-	printk(KERN_INFO "Succesfully created mailbox!\n");
+	
 	m = getMailbox(pid);
+	if (m == NULL)
+		printk(KERN_INFO "m is NULL!\n");
 	
 	// get a message_info
-	kinfo = *(getMessage(m));
+	rcv_message = getMessage(m);
+	*sender = rcv_message->sender;
+	mesg = (char *) rcv_message->msg;
+	*len = rcv_message->len;
 	
-	printk("Recieved a message: %s\n", (char *) kinfo.msg);
-
-	if(copy_to_user(info, &kinfo, sizeof(kinfo)))
-	{
-		return MAILBOX_ERROR;
-	}
+	printk("Received a message: %s\n", (char *) mesg);
+	/*
+	if(copy_to_user(sender, &rcv_sender, sizeof(pid_t)))
+		return MSG_ARG_ERROR;
+		
+	if(copy_to_user(msg, rcv_msg, sizeof(void *)))
+		return MSG_ARG_ERROR;
+		
+	if(copy_to_user(len, &rcv_len, sizeof(int)))
+		return MSG_ARG_ERROR;
+	*/
+	if(copy_to_user(msg, mesg, sizeof(char) * MAX_MSG_SIZE))
+		return MSG_ARG_ERROR;
 	
 	
-	// delete sent message from mailbox
 	deleteMessage(m);
-
+	
 	return 0;
 }
 
 
 
 
-asmlinkage long sys_mailbox_manage(struct manage_info *info)
+asmlinkage long sys_mailbox_manage(bool stop, int *count)
 {
-	struct manage_info kinfo;
 	pid_t pid;
 	mailbox* m;
+	/*
+	bool manage_stop;
+	int manage_count;
+	*/
 	
-
-
-	if(copy_from_user(&kinfo, info, sizeof(kinfo)))
-	{
+	pid = current->pid;
+	/*
+	if(copy_from_user(&manage_stop, &stop, sizeof(bool)))
 		return MSG_ARG_ERROR;
-	}
-
-	pid = kinfo.pid;
-
-	m = getMailbox(pid);
-
-	if (m == NULL)
+	
+	if(copy_from_user(&manage_count, count, sizeof(int)))
+		return MSG_ARG_ERROR;
+		*/
+	if (getMailbox(pid) == NULL)
 	{
 		createMailbox(pid);
-		m = getMailbox(pid);
+		printk("Created mailbox for process %d!\n", pid);
 	}
 
-	m->stop = kinfo.stop;
-
-	*(kinfo.count) = m->count;
+	printk("Started managing mailbox.\n");
 	
-	if(copy_to_user(info, &kinfo, sizeof(kinfo)))
+	m = getMailbox(pid);
+	printk("Got mailbox for pid %d!\n", pid);
+	
+	m->stop = stop;
+	printk("Managed stop.\n");
+	
+	*count = m->count;
+	printk("There are %d messages in the mailbox.", *count);
+	
+	/*if(copy_to_user(count, &manage_count, sizeof(int)))
 	{
 		return MSG_ARG_ERROR;
-	}
+	}*/
 	
 	return 0;
 }
