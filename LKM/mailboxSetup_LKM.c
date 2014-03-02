@@ -128,12 +128,23 @@ mailbox* getMailbox(pid_t pid)
 
 	if (node_ptr == NULL)
 		return NULL;
+		
+		
+	// ISSUE HAPPENS BETWEEN HERE
+	
 	while(node_ptr->pid != pid)
 	{
 		if (node_ptr == NULL)
 			return NULL;
 		node_ptr = node_ptr->next_node;
 	}
+
+	printk("There are %d messages in this box", node_ptr->box->count);
+
+	// AND HERE
+	// TORUBLE MAKING MORE THAN ONE MAILBOX IN FORK PROGRAM
+	// MANAGE MAILBOX FIRST CALLS GETMAILBOX
+
 
 	return node_ptr->box;
 }
