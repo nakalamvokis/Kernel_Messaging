@@ -153,19 +153,19 @@ mailbox* getMailbox(pid_t pid)
 	while(node_ptr->pid != pid)
 	{
 		printk("Checking node pids\n");
-		
-		if (node_ptr == NULL)
+		printk("node_ptr is not null\n");
+	    node_ptr = node_ptr->next_node;
+	    
+	    if (node_ptr == NULL)
 		{
+			printk("node_ptr is null\n");
 			return NULL;
 		}
-		
-	    node_ptr = node_ptr->next_node;
+	    printk("Set node pointer!!!!\n");
 	}
 
 
 	printk("Theres are %d messages in this box", node_ptr->box->count);
-
-	printk("There are %d messages in this box", node_ptr->box->count);
 
 	// AND HERE
 	// TORUBLE MAKING MORE THAN ONE MAILBOX IN FORK PROGRAM
@@ -446,6 +446,7 @@ asmlinkage long sys_mailbox_manage(bool stop, int *count)
 		
 	if (getMailbox(pid) == NULL)
 	{
+		printk("About to create a mailbox for process %d!\n", pid);
 		createMailbox(pid);
 		printk("Created mailbox for process %d!\n", pid);
 	}
