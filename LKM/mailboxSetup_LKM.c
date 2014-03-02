@@ -136,41 +136,21 @@ mailbox* getMailbox(pid_t pid)
 	list_node* node_ptr;
 	node_ptr = h.head;
 
-	printk("Starting to get mailbox\n");
-
-
 	if (node_ptr == NULL)
 	{
-		printk("Head is null\n");
 		return NULL;
 	}
 		
-	printk("Head is not null\n");
-		
-		
-	// ISSUE HAPPENS BETWEEN HERE
 	
 	while(node_ptr->pid != pid)
 	{
-		printk("Checking node pids\n");
-		printk("node_ptr is not null\n");
 	    node_ptr = node_ptr->next_node;
 	    
 	    if (node_ptr == NULL)
 		{
-			printk("node_ptr is null\n");
 			return NULL;
 		}
-	    printk("Set node pointer!!!!\n");
 	}
-
-
-	printk("Theres are %d messages in this box", node_ptr->box->count);
-
-	// AND HERE
-	// TORUBLE MAKING MORE THAN ONE MAILBOX IN FORK PROGRAM
-	// MANAGE MAILBOX FIRST CALLS GETMAILBOX
-
 	return node_ptr->box;
 }
 
