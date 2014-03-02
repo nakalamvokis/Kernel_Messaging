@@ -298,9 +298,10 @@ asmlinkage long sys_mailbox_rcv(struct message_info *info)
 	printk(KERN_INFO "Succesfully created mailbox!\n");
 	m = getMailbox(pid);
 	
-	printk("Recieved a message: %s\n", (char *) kinfo.msg);
 	// get a message_info
 	kinfo = *(getMessage(m));
+	
+	printk("Recieved a message: %s\n", (char *) kinfo.msg);
 
 	if(copy_to_user(info, &kinfo, sizeof(kinfo)))
 	{
