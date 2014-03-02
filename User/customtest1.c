@@ -3,37 +3,36 @@
 
 int main()
 {
-	pid_t parent;
-	parent = getpid();
-	int status, count;
-	int childPID = fork();
-
-	if(childPID == 0) 
+	pid_t pid = fork();
+	int status;
+	
+	if (pid == 0)
 	{
+		printf("Child managing\n");
+		status = manage();
 		sleep(1);
-		char mesg[] = "I am your child!";
-		status = SendMsg(childPID, mesg, 17, false);
-		if (status)
-			printf("SendMsg failed with error status: %d\n", status);
-		else
-			printf("SendMsg was successful!\n");
+		printf("Childing exiting\n");
+		exit(0);
 	}
 	else
 	{
-		pid_t child;
-		void *msg[128];
-		int len;
-		sleep(2);
-		status = RcvMsg(&child, msg, &len, false);
-		if (status)
-			printf("RcvMsg failed with error status: %d\n", status);
-		else
-		{
-			printf("Message received.\n");
-			printf("Message: %s\n", (char *) msg);
-		}
+		sleep(5);
+		printf("Parent managing\n");
+		status = manage();
+		printf("Parent exiting\n");
 	}
 	
-	return 0;
-	
+	return 0;	
+}
+
+int manage()
+{
+	int status, count;
+	status = ManageMailbox(false, &count);
+	if (status)
+		printf("Manage ERROR: %d\n", status);
+	else
+		printf("%d messages in the mailbox!", count);
+		
+	return status;
 }

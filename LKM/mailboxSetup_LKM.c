@@ -84,24 +84,33 @@ int deleteMessage(mailbox* m);
 // HASH TABLE FUNCTIONS
 
 /* function to create new mailbox
- * param pid -> pid of process to be assigned a mailbox
+ * pa
+ram pid -> pid of process to be assigned a mailbox
  */
 int createMailbox(pid_t pid)
 {
+	printk("Started create.\n");
 	list_node* node_ptr;
 	list_node* new_node = kmem_cache_alloc(lcache, GFP_KERNEL);
 	mailbox* new_mailbox = kmem_cache_alloc(mcache, GFP_KERNEL);
 	
+	printk("Allocated space for mailbox!\n");
+	
 	if (h.head == NULL)
+	{
 		h.head = new_node;
+	}
+	
 	else 
 	{
+		printk("Node is not head!\n");
 		node_ptr = h.head;
 		while(node_ptr->next_node != NULL)
 		{
 			node_ptr = node_ptr->next_node;
 		}
 		node_ptr->next_node = new_node;
+		printk("Found node!\n");
 	}
 	
 	new_mailbox->pid = pid;
@@ -111,6 +120,7 @@ int createMailbox(pid_t pid)
 	new_node->box = new_mailbox;
 	new_node->pid = pid;
 	new_node->next_node = NULL;
+	printk("Set node!\n");
 
 	return 0;
 }
@@ -126,14 +136,30 @@ mailbox* getMailbox(pid_t pid)
 	list_node* node_ptr;
 	node_ptr = h.head;
 
+	printk("Starting to get mailbox\n");
+
+
 	if (node_ptr == NULL)
+	{
+		printk("Head is null\n");
 		return NULL;
+	}
+		
+	printk("Head is not null\n");
+		
 	while(node_ptr->pid != pid)
 	{
+		printk("Checking node pids\n");
+		
 		if (node_ptr == NULL)
+		{
 			return NULL;
-		node_ptr = node_ptr->next_node;
+		}
+		
+	    node_ptr = node_ptr->next_node;
 	}
+
+	printk("Theres are %d messages in this box", node_ptr->box->count);
 
 	return node_ptr->box;
 }
@@ -246,13 +272,9 @@ asmlinkage long sys_mailbox_send(pid_t dest, void *msg, int len, bool block)
 	
 	message_info new_message;
 	
-	printk("dest: %d, msg: %s, len: %d  \n", dest, (char *)msg, len);
-	
-	
-	
+	printk("\ndest: %d, msg: %s, len: %d  \n", dest, (char *)msg, len);
 	
 	pid = current->pid;
-
 
 	/*
 	if((status = copy_from_user(&send_dest, &dest, sizeof())))
@@ -375,7 +397,7 @@ asmlinkage long sys_mailbox_rcv(pid_t *sender, void *msg, int *len, bool block)
 	if(copy_to_user(len, &rcv_len, sizeof(int)))
 		return MSG_ARG_ERROR;
 	*/
-	if(copy_to_user(msg, mesg, sizeof(char) * MAX_MSG_SIZE))
+	if(copy_to_user(msg, mesg, sizeof(char) * (*len)))
 		return MSG_ARG_ERROR;
 	
 	
@@ -389,12 +411,15 @@ asmlinkage long sys_mailbox_rcv(pid_t *sender, void *msg, int *len, bool block)
 
 asmlinkage long sys_mailbox_manage(bool stop, int *count)
 {
+	printk("Started managing function.\n");
 	pid_t pid;
 	mailbox* m;
 	/*
 	bool manage_stop;
 	int manage_count;
 	*/
+	
+	
 	
 	pid = current->pid;
 	/*
@@ -404,11 +429,17 @@ asmlinkage long sys_mailbox_manage(bool stop, int *count)
 	if(copy_from_user(&manage_count, count, sizeof(int)))
 		return MSG_ARG_ERROR;
 		*/
+		
+	printk("Still managing.\n");
+		
+		// PROBLEM IS IN GETMAILBOX
+		
 	if (getMailbox(pid) == NULL)
 	{
 		createMailbox(pid);
 		printk("Created mailbox for process %d!\n", pid);
 	}
+	
 
 	printk("Started managing mailbox.\n");
 	
