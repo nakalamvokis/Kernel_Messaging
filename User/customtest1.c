@@ -10,7 +10,6 @@ int main()
 
 	if(childPID == 0) 
 	{
-		ManageMailbox(false, &count);
 		sleep(1);
 		char mesg[] = "I am your child!";
 		status = SendMsg(childPID, mesg, 17, false);
@@ -24,9 +23,7 @@ int main()
 		pid_t child;
 		void *msg[128];
 		int len;
-		
-		ManageMailbox(false, &count);
-		sleep(1);
+		sleep(2);
 		status = RcvMsg(&child, msg, &len, false);
 		if (status)
 			printf("RcvMsg failed with error status: %d\n", status);

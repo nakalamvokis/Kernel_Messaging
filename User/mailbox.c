@@ -22,7 +22,6 @@ typedef struct message_info
 // struct to be passed as parameter for manage syscall
 typedef struct manage_info
 {
-	pid_t pid;
 	bool stop;
 	int *count;
 } manage_info;
@@ -38,12 +37,12 @@ typedef struct manage_info
 long SendMsg(pid_t dest, void *msg, int len, bool block)
 {
 	message_info info;
-	*(info.sender) = getpid();
 	info.dest = dest;
 	info.msg = msg;
 	info.len = len;
 	info.block = block;
-	printf("Sending message %s, to dest %d from pid %d!\n", (char *) info.msg, info.dest, *info.sender);
+	printf("Sending message %s, to dest %d!\n", (char *) info.msg, info.dest);
+	 
 	return syscall(__NR_cs3013_syscall1, &info);
 }
 
@@ -59,12 +58,16 @@ long RcvMsg(pid_t *sender, void *msg, int *len, bool block)
 {
 	message_info info;
 	
-	info.sender = sender;
-	info.msg = msg;
-	info.lenPtr = len;
+	
 	info.block = block;
 	
-	return syscall(__NR_cs3013_syscall2, &info);
+	int status = syscall(__NR_cs3013_syscall2, &info);
+	
+	sender = info.sender;
+	msg = info.msg;
+	len = info.lenPtr;
+	
+	return status;
 }
 
 
@@ -77,9 +80,8 @@ long RcvMsg(pid_t *sender, void *msg, int *len, bool block)
 long ManageMailbox(bool stop, int *count)
 {
 	manage_info info;
-	info.pid = getpid();
 	info.stop = stop;
-	info.count = count;
-	
-	return syscall(__NR_cs3013_syscall3, &info);
+	int status = syscall(__NR_cs3013_syscall3, &info);
+	count = info.count;
+	return status;
 }
