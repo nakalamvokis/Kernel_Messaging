@@ -66,11 +66,12 @@ asmlinkage long (*ref_sys_cs3013_syscall1)(void);
 asmlinkage long (*ref_sys_cs3013_syscall2)(void);
 asmlinkage long (*ref_sys_cs3013_syscall3)(void);
 
-asmlinkage long (*ref_sys_exit)(long code);
-asmlinkage long (*ref_sys_exit_group)(int exit_code);
+/*asmlinkage void (*ref_sys_exit)(long code);
+asmlinkage void (*ref_sys_exit_group)(int exit_code);*/
 
 static struct kmem_cache* mcache;
 static struct kmem_cache* lcache;
+static struct kmem_cache* msgcache;
 
 static hash_table h;
  
@@ -78,7 +79,7 @@ int createMailbox(pid_t pid);
 mailbox* getMailbox(pid_t pid);
 int deleteMailbox(pid_t pid);
 
-int addMessage(mailbox* m, message_info* info);
+int addMessage(mailbox* m, pid_t dest, pid_t sender, void* msg, int len);
 message_info* getMessage(mailbox* m);
 int deleteMessage(mailbox* m);
 
@@ -198,25 +199,23 @@ int deleteMailbox(pid_t pid)
  * param m -> mailbox to receive message
  * param info -> message to add to mailbox
  */
-int addMessage(mailbox* m, message_info* info)
+int addMessage(mailbox* m, pid_t dest, pid_t sender, void* msg, int len)
 {	
-	message_info new_message;
-	
 	spin_lock(&m->mlock);
 	
-	if(m->count == MAILBOX_SIZE)
+	if(m->count == (MAILBOX_SIZE - 1))
 	{
 		return MAILBOX_FULL;
 	}
-
-	new_message = *info;
-
-	m->messages[m->count] = new_message;
+	m->messages[m->count].dest = dest;
+	m->messages[m->count].sender = sender;
+	m->messages[m->count].len = len;
+	m->messages[m->count].msg = kmem_cache_alloc(msgcache, GFP_KERNEL);
+	strncpy(m->messages[m->count].msg, (char *)msg, len);
 	
 	printk("Added a message: %s\n", (char *) m->messages[m->count].msg);
 	
 	m->count++;
-	
 	spin_unlock(&m->mlock);
 	
 	return 0;
@@ -245,9 +244,11 @@ int deleteMessage(mailbox* m)
 {
 	int i;
 	spin_lock(&m->mlock);
-	
-	for(i = 0; i < m->count; i++)
+
+	kmem_cache_free(msgcache, m->messages[m->count - 1].msg);
+	for(i = 0; i < (m->count - 1); i++)
 	{
+		printk(".");
 		m->messages[i] = m->messages[i+1];
 	}
 	m->count--;
@@ -265,8 +266,6 @@ asmlinkage long sys_mailbox_send(pid_t dest, void *msg, int len, bool block)
 	int send_len;
 	bool send_block;
 	unsigned long status;*/
-	
-	message_info new_message;
 	
 	pid = current->pid;
 
@@ -309,24 +308,22 @@ asmlinkage long sys_mailbox_send(pid_t dest, void *msg, int len, bool block)
 	//printk(KERN_INFO "Message of right size.");
 	
 	if(getMailbox(dest) == NULL)
-		return MAILBOX_INVALID;
+	{
+		/*return MAILBOX_INVALID;*/
+		createMailbox(dest);
+	}
+		
 	
 	//printk(KERN_INFO "Mailbox valid!\n");
 	
 	m = getMailbox(dest);
-	
-	new_message.dest = dest;
-	new_message.len = len;
-	new_message.msg = (char *) msg;
-	new_message.sender = pid;
-	
 
 	/*while(spin_trylock(&(m->mlock)) == 0)
 	{
 	// wait for lock of spinlock
 	}*/
 	
-	addMessage(m, &new_message);
+	addMessage(m, dest, pid, msg, len);
 	
 	//spin_unlock(&(m->mlock)); // unlock spinlock
 	
@@ -469,24 +466,24 @@ asmlinkage long sys_mailbox_manage(bool stop, int *count)
 	return 0;
 }
 /*
-asmlinkage long sys_new_exit(long code)
+asmlinkage void sys_new_exit(long code)
 {
 	pid_t pid;
 	pid = current->pid;
 	
-	if(getMailbox(pid) != NULL)
-		deleteMailbox(pid);
-	
+	deleteMailbox(pid);
+
+	printk("Deleted mailbox for pid %d!\n", pid);
 	ref_sys_exit(code);
 }
-asmlinkage long sys_new_exit_group(int exit_code)
+asmlinkage void sys_new_exit_group(int exit_code)
 {
 	pid_t pid;
 	pid = current->pid;
 	
-	if(getMailbox(pid) != NULL)
-		deleteMailbox(pid);
-	
+	deleteMailbox(pid);
+
+	printk("Deleted mailbox for group pid %d!\n", pid);
 	ref_sys_exit_group(exit_code);
 } */
 
@@ -538,8 +535,8 @@ static int __init interceptor_start(void)
 	ref_sys_cs3013_syscall2 = (void *)sys_call_table[__NR_cs3013_syscall2];
 	ref_sys_cs3013_syscall3 = (void *)sys_call_table[__NR_cs3013_syscall3];
 	
-	//ref_sys_exit = (void *)sys_call_table[__NR_exit];
-	//ref_sys_exit = (void *)sys_call_table[__NR_exit_group];
+	/*ref_sys_exit = (void *)sys_call_table[__NR_exit];
+	ref_sys_exit = (void *)sys_call_table[__NR_exit_group];*/
 
 	/* Replace the existing system calls */
 	disable_page_protection();
@@ -548,10 +545,13 @@ static int __init interceptor_start(void)
 	sys_call_table[__NR_cs3013_syscall2] = (unsigned long *)sys_mailbox_rcv;
 	sys_call_table[__NR_cs3013_syscall3] = (unsigned long *)sys_mailbox_manage;
 
+	/*sys_call_table[__NR_exit] = (unsigned long *)sys_new_exit;
+	sys_call_table[__NR_exit_group] = (unsigned long *)sys_new_exit_group;*/
 	enable_page_protection();
 	
 	mcache = kmem_cache_create("Mailboxes", sizeof(mailbox), 0, 0, NULL);
 	lcache = kmem_cache_create("Hash Tables Entries", sizeof(list_node), 0, 0, NULL);
+	msgcache = kmem_cache_create("Message", sizeof(char) * MAX_MSG_SIZE, 0, 0, NULL);
 	
 	/* And indicate the load was successful */
 	printk(KERN_INFO "Loaded interceptor!\n");
@@ -572,14 +572,14 @@ static void __exit interceptor_end(void)
 	sys_call_table[__NR_cs3013_syscall2] = (unsigned long *)ref_sys_cs3013_syscall2;
 	sys_call_table[__NR_cs3013_syscall3] = (unsigned long *)ref_sys_cs3013_syscall3;
 	
-	//sys_call_table[__NR_exit] = (unsigned long *)ref_sys_exit;
-	//sys_call_table[__NR_exit_group] = (unsigned long *)ref_sys_exit_group;
+	/*sys_call_table[__NR_exit] = (unsigned long *)ref_sys_exit;
+	sys_call_table[__NR_exit_group] = (unsigned long *)ref_sys_exit_group;*/
 	enable_page_protection();
 
 
 	kmem_cache_destroy(mcache);
 	kmem_cache_destroy(lcache);
-	
+	kmem_cache_destroy(msgcache);
 	printk(KERN_INFO "Unloaded interceptor!\n");
 }	// static void __exit interceptor_end(void)
 
