@@ -1,6 +1,6 @@
 # Nick Kalamvokis and Etienne Scraire CS3013-C14
 
-obj-m := mailboxSetup.o
+obj-m := mailboxSetup_LKM.o
 KDIR := /lib/modules/$(shell uname -r)/build
 PWD := $(shell pwd)
 

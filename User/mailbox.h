@@ -9,7 +9,7 @@
 #define __MAILBOX__
 
 #include <stdbool.h>
-#include <linux/types.h>
+#include <sys/types.h>
 
 #define NO_BLOCK 0
 #define BLOCK   1

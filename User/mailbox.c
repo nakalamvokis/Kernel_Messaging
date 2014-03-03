@@ -1,5 +1,12 @@
+#include <syscall.h>
+#include <unistd.h>
+#include <sys/types.h>
+#include <stdio.h>
+#include "mailbox.h"
 
-
+#define __NR_cs3013_syscall1 349
+#define __NR_cs3013_syscall2 350
+#define __NR_cs3013_syscall3 351
 
 
 /* function to send a message to another running process (using syscalls)
@@ -10,14 +17,7 @@
  */
 long SendMsg(pid_t dest, void *msg, int len, bool block)
 {
-	message_info info;
-	
-	info.dest = dest;
-	info.msg = msg;
-	info.len = len;
-	info.block = block;
-	
-	return (cs3013_syscall1, &info);
+	return syscall(__NR_cs3013_syscall1, dest, msg, len, block);
 }
 
 
@@ -30,14 +30,7 @@ long SendMsg(pid_t dest, void *msg, int len, bool block)
  */
 long RcvMsg(pid_t *sender, void *msg, int *len, bool block)
 {
-	message_info info;
-	
-	info.sender = sender;
-	info.msg = msg;
-	info.len = len;
-	info.block = block;
-	
-	return (cs3013_syscall2, &info);
+	return syscall(__NR_cs3013_syscall2, sender, msg, len, block);
 }
 
 
@@ -49,10 +42,5 @@ long RcvMsg(pid_t *sender, void *msg, int *len, bool block)
  */
 long ManageMailbox(bool stop, int *count)
 {
-	struct manage_info info;
-	
-	info.stop = stop;
-	info.count = count;
-	
-	return (cs3013_syscall3, &info);
+	return syscall(__NR_cs3013_syscall3, stop, count);
 }
