@@ -44,6 +44,7 @@ typedef struct mailbox
 	int count;
 	bool stop;
 	message_info messages[MAILBOX_SIZE];
+	wait_queue_head_t waitqueue;
 } mailbox;
 
 
@@ -298,25 +299,52 @@ asmlinkage long sys_mailbox_send(pid_t dest, void *msg, int len, bool block)
 		createMailbox(pid);
 		printk("Created mailbox for process %d!\n", pid);
 	}
-
-	if(block == true)
-		return MAILBOX_STOPPED;
-	//printk(KERN_INFO "Mailbox not stopped!\n");
-	
-	if(len > MAX_MSG_SIZE || len < 0)
-		return MSG_LENGTH_ERROR;
-	//printk(KERN_INFO "Message of right size.");
 	
 	if(getMailbox(dest) == NULL)
 	{
 		/*return MAILBOX_INVALID;*/
 		createMailbox(dest);
 	}
-		
-	
 	//printk(KERN_INFO "Mailbox valid!\n");
-	
+
+	if(len > MAX_MSG_SIZE || len < 0)
+		return MSG_LENGTH_ERROR;
+		
+	//printk(KERN_INFO "Message of right size.");
+
+
+
 	m = getMailbox(dest);
+	
+	spin_lock(&m->mlock);
+	
+	if((m->count == MAILBOX_SIZE -1)||(block == true))
+	{
+		m->stop = true;
+	}
+	
+	if(m->stop == true)
+	{
+		DEFINE_WAIT(wait);
+		add_wait_queue(m->waitqueue, &wait);
+		prepare_to_wait(&(m->waitqueue), &wait, TASK_INTERRUPTIBLE);
+		
+		while(m->stop == true)
+		{
+			spin_unlock(&m->mlock);
+			usleep(10);
+			spin_lock(&m->mlock);
+			if(m->count < MAILBOX_SIZE - 1)
+				break;
+		}
+		finish_wait(&(m->waitqueue), &wait);
+		spin_unlock(&m->mlock);	
+	}
+
+	//printk(KERN_INFO "Mailbox not stopped!\n");
+	
+	
+
 	
 	addMessage(m, dest, pid, msg, len);
 	
@@ -351,6 +379,7 @@ asmlinkage long sys_mailbox_rcv(pid_t *sender, void *msg, int *len, bool block)
 	if(copy_from_user(&rcv_block, &block, sizeof(bool)))
 		return MSG_ARG_ERROR;
 	*/
+	
 	pid = current->pid;
 		
 	if (getMailbox(pid) == NULL)
@@ -361,11 +390,13 @@ asmlinkage long sys_mailbox_rcv(pid_t *sender, void *msg, int *len, bool block)
 
 	//printk(KERN_INFO "Started receiving!\n");
 
-	if (block == true)
-		return MAILBOX_STOPPED;
-	//printk(KERN_INFO "Mailbox not stopped!\n");
-	
 	m = getMailbox(pid);
+	
+	if (block == true)
+	{
+		return MAILBOX_STOPPED;
+	}
+	//printk(KERN_INFO "Mailbox not stopped!\n");
 	
 	spin_lock(&m->mlock);
 	
@@ -394,8 +425,6 @@ asmlinkage long sys_mailbox_rcv(pid_t *sender, void *msg, int *len, bool block)
 	if(copy_to_user(msg, mesg, sizeof(char) * (*len)))
 		return MSG_ARG_ERROR;
 		
-
-	
 	deleteMessage(m);
 	
 	//spin_unlock(&(m->mlock));
