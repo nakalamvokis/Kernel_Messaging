@@ -116,6 +116,7 @@ int createMailbox(pid_t pid)
 		printk("Found node!\n");
 	}
 	
+	spin_lock_init(&new_mailbox->mlock);
 	new_mailbox->pid = pid;
 	new_mailbox->count = 0;
 	new_mailbox->stop = false;
@@ -204,6 +205,8 @@ int addMessage(mailbox* m, message_info* info)
 {	
 	message_info new_message;
 	
+	spin_lock(&m->mlock);
+	
 	if(m->count == MAILBOX_SIZE)
 	{
 		return MAILBOX_FULL;
@@ -216,6 +219,9 @@ int addMessage(mailbox* m, message_info* info)
 	printk("Added a message: %s\n", (char *) m->messages[m->count].msg);
 	
 	m->count++;
+	
+	spin_unlock(&m->mlock);
+	
 	return 0;
 }
 
@@ -241,14 +247,16 @@ message_info* getMessage(mailbox* m)
 int deleteMessage(mailbox* m)
 {
 	int i;
-	
-	printk("Deleted a message: %s\n", (char *) m->messages[0].msg);
+	spin_lock(&m->mlock);
 	
 	for(i = 0; i < m->count; i++)
 	{
 		m->messages[i] = m->messages[i+1];
 	}
 	m->count--;
+	spin_unlock(&m->mlock);
+	
+	printk("Deleted a message: %s\n", (char *) m->messages[0].msg);
 	
 	return 0;
 }
@@ -274,8 +282,6 @@ asmlinkage long sys_mailbox_send(pid_t dest, void *msg, int len, bool block)
 	unsigned long status;*/
 	
 	message_info new_message;
-	
-	printk("\ndest: %d, msg: %s, len: %d  \n", dest, (char *)msg, len);
 	
 	pid = current->pid;
 
