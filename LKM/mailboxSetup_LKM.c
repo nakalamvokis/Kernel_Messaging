@@ -66,8 +66,8 @@ asmlinkage long (*ref_sys_cs3013_syscall1)(void);
 asmlinkage long (*ref_sys_cs3013_syscall2)(void);
 asmlinkage long (*ref_sys_cs3013_syscall3)(void);
 
-//asmlinkage long (*ref_sys_exit)(DONT KNOW PARAMS YET);
-
+asmlinkage long (*ref_sys_exit)(long code);
+asmlinkage long (*ref_sys_exit_group)(int exit_code);
 
 static struct kmem_cache* mcache;
 static struct kmem_cache* lcache;
@@ -255,16 +255,6 @@ int deleteMessage(mailbox* m)
 	
 	return 0;
 }
-
-/*
-asmlinkage long (*ref_sys_exit)(DONT KNOW PARAMS YET);
-{
-	pid_t pid;
-	pid = current->pid;
-	
-	deleteMailbox(pid);
-}
-*/
 
 
 asmlinkage long sys_mailbox_send(pid_t dest, void *msg, int len, bool block)
@@ -483,7 +473,26 @@ asmlinkage long sys_mailbox_manage(bool stop, int *count)
 	return 0;
 }
 
-
+asmlinkage long sys_new_exit(long code)
+{
+	pid_t pid;
+	pid = current->pid;
+	
+	if(getMailbox(pid) != NULL)
+		deleteMailbox(pid);
+	
+	ref_sys_exit(code);
+}
+asmlinkage long sys_new_exit_group(int exit_code)
+{
+	pid_t pid;
+	pid = current->pid;
+	
+	if(getMailbox(pid) != NULL)
+		deleteMailbox(pid);
+	
+	ref_sys_exit_group(exit_code);
+}
 
 
 static unsigned long **find_sys_call_table(void)
@@ -534,7 +543,7 @@ static int __init interceptor_start(void)
 	ref_sys_cs3013_syscall3 = (void *)sys_call_table[__NR_cs3013_syscall3];
 	
 	//ref_sys_exit = (void *)sys_call_table[__NR_exit];
-
+	//ref_sys_exit = (void *)sys_call_table[__NR_exit_group];
 
 	/* Replace the existing system calls */
 	disable_page_protection();
@@ -568,7 +577,7 @@ static void __exit interceptor_end(void)
 	sys_call_table[__NR_cs3013_syscall3] = (unsigned long *)ref_sys_cs3013_syscall3;
 	
 	//sys_call_table[__NR_exit] = (unsigned long *)ref_sys_exit;
-	
+	//sys_call_table[__NR_exit_group] = (unsigned long *)ref_sys_exit_group;
 	enable_page_protection();
 
 
