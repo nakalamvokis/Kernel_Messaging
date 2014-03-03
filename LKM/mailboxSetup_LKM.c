@@ -297,7 +297,7 @@ asmlinkage long sys_mailbox_send(pid_t dest, void *msg, int len, bool block)
 	if (getMailbox(pid) == NULL)
 	{
 		createMailbox(pid);
-		printk("Created mailbox for process %d!", pid);
+		printk("Created mailbox for process %d!\n", pid);
 	}
 
 	if(block == true)
@@ -320,16 +320,15 @@ asmlinkage long sys_mailbox_send(pid_t dest, void *msg, int len, bool block)
 	new_message.msg = (char *) msg;
 	new_message.sender = pid;
 	
-	/* //try spinlock
-	while(spin_trylock(&(m->lock)) == 0)
+
+	/*while(spin_trylock(&(m->mlock)) == 0)
 	{
 	// wait for lock of spinlock
-	}
+	}*/
 	
-	*/
 	addMessage(m, &new_message);
 	
-	// spin_unlock(&(m->lock)); // unlock spinlock
+	//spin_unlock(&(m->mlock)); // unlock spinlock
 	
 	printk("Sent a message: %s\n", (char *) m->messages[0].msg);
 	
@@ -367,7 +366,7 @@ asmlinkage long sys_mailbox_rcv(pid_t *sender, void *msg, int *len, bool block)
 	if (getMailbox(pid) == NULL)
 	{
 		createMailbox(pid);
-		printk("Created mailbox for process %d!", pid);
+		printk("Created mailbox for process %d!\n", pid);
 	}
 
 	//printk(KERN_INFO "Started receiving!\n");
@@ -378,14 +377,11 @@ asmlinkage long sys_mailbox_rcv(pid_t *sender, void *msg, int *len, bool block)
 	
 	m = getMailbox(pid);
 	
-	/* //try spinlock
-	while(spin_trylock(&(m->lock)) == 0)
+
+	/*while(spin_trylock(&(m->mlock)) == 0)
 	{
 	// wait for lock of spinlock
-	}
-	
-	*/
-	
+	}*/	
 	
 	// get a message_info
 	rcv_message = getMessage(m);
@@ -410,7 +406,7 @@ asmlinkage long sys_mailbox_rcv(pid_t *sender, void *msg, int *len, bool block)
 	
 	deleteMessage(m);
 	
-	// spin_unlock(&(m->lock)); // unlock spinlock
+	//spin_unlock(&(m->mlock)); // unlock spinlock
 	
 	return 0;
 }
@@ -448,8 +444,8 @@ asmlinkage long sys_mailbox_manage(bool stop, int *count)
 	printk("Got mailbox for pid %d!\n", pid);
 	
 	
-		/* //try spinlock
-	while(spin_trylock(&(m->lock)) == 0)
+	/* //try spinlock
+	while(spin_trylock(&(m->mlock)) == 0)
 	{
 	// wait for lock of spinlock
 	}
@@ -461,7 +457,7 @@ asmlinkage long sys_mailbox_manage(bool stop, int *count)
 	
 	*count = m->count;
 	
-	// spin_unlock(&(m->lock)); // unlock spinlock
+	// spin_unlock(&(m->mlock)); // unlock spinlock
 	
 	//printk("There are %d messages in the mailbox.", *count);
 	
@@ -472,7 +468,7 @@ asmlinkage long sys_mailbox_manage(bool stop, int *count)
 	
 	return 0;
 }
-
+/*
 asmlinkage long sys_new_exit(long code)
 {
 	pid_t pid;
@@ -492,7 +488,7 @@ asmlinkage long sys_new_exit_group(int exit_code)
 		deleteMailbox(pid);
 	
 	ref_sys_exit_group(exit_code);
-}
+} */
 
 
 static unsigned long **find_sys_call_table(void)
