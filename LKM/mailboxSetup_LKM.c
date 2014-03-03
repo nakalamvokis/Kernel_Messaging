@@ -317,15 +317,8 @@ asmlinkage long sys_mailbox_send(pid_t dest, void *msg, int len, bool block)
 	//printk(KERN_INFO "Mailbox valid!\n");
 	
 	m = getMailbox(dest);
-
-	/*while(spin_trylock(&(m->mlock)) == 0)
-	{
-	// wait for lock of spinlock
-	}*/
 	
 	addMessage(m, dest, pid, msg, len);
-	
-	//spin_unlock(&(m->mlock)); // unlock spinlock
 	
 	printk("Sent a message: %s\n", (char *) m->messages[0].msg);
 	
@@ -374,11 +367,10 @@ asmlinkage long sys_mailbox_rcv(pid_t *sender, void *msg, int *len, bool block)
 	
 	m = getMailbox(pid);
 	
-
-	/*while(spin_trylock(&(m->mlock)) == 0)
-	{
-	// wait for lock of spinlock
-	}*/	
+	spin_lock(&m->mlock);
+	
+	if(m->count == 0)
+		return MAILBOX_EMPTY;
 	
 	// get a message_info
 	rcv_message = getMessage(m);
@@ -397,13 +389,16 @@ asmlinkage long sys_mailbox_rcv(pid_t *sender, void *msg, int *len, bool block)
 	if(copy_to_user(len, &rcv_len, sizeof(int)))
 		return MSG_ARG_ERROR;
 	*/
+	spin_unlock(&m->mlock);
+		
 	if(copy_to_user(msg, mesg, sizeof(char) * (*len)))
 		return MSG_ARG_ERROR;
-	
+		
+
 	
 	deleteMessage(m);
 	
-	//spin_unlock(&(m->mlock)); // unlock spinlock
+	//spin_unlock(&(m->mlock));
 	
 	return 0;
 }
@@ -438,6 +433,7 @@ asmlinkage long sys_mailbox_manage(bool stop, int *count)
 	}
 
 	m = getMailbox(pid);
+	spin_lock(&m->mlock);
 	printk("Got mailbox for pid %d!\n", pid);
 	
 	
@@ -462,6 +458,8 @@ asmlinkage long sys_mailbox_manage(bool stop, int *count)
 	{
 		return MSG_ARG_ERROR;
 	}*/
+	
+	spin_unlock(&m->mlock);
 	
 	return 0;
 }

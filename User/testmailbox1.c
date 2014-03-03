@@ -19,7 +19,6 @@ int main() {
     int len;
 	int count;
     ManageMailbox(false, &count);
-    usleep(500);
     if(status= RcvMsg(&sender,msg,&len,false))
 		printf("ERROR: %d\n", status);
 	else {
@@ -28,7 +27,6 @@ int main() {
     }
   }
   else{
-	usleep(200);
     char mesg[] = "I am your father";
     printf("Sending Message to child.\n");
     if (status=SendMsg(childPID, mesg, 17, false)){
