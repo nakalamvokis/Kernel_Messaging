@@ -92,12 +92,9 @@ ram pid -> pid of process to be assigned a mailbox
  */
 int createMailbox(pid_t pid)
 {
-	printk("Started create.\n");
 	list_node* node_ptr;
 	list_node* new_node = kmem_cache_alloc(lcache, GFP_KERNEL);
 	mailbox* new_mailbox = kmem_cache_alloc(mcache, GFP_KERNEL);
-	
-	printk("Allocated space for mailbox!\n");
 	
 	if (h.head == NULL)
 	{
@@ -106,14 +103,14 @@ int createMailbox(pid_t pid)
 	
 	else 
 	{
-		printk("Node is not head!\n");
+		//printk("Node is not head!\n");
 		node_ptr = h.head;
 		while(node_ptr->next_node != NULL)
 		{
 			node_ptr = node_ptr->next_node;
 		}
 		node_ptr->next_node = new_node;
-		printk("Found node!\n");
+		//printk("Found node!\n");
 	}
 	
 	spin_lock_init(&new_mailbox->mlock);
@@ -124,7 +121,7 @@ int createMailbox(pid_t pid)
 	new_node->box = new_mailbox;
 	new_node->pid = pid;
 	new_node->next_node = NULL;
-	printk("Set node!\n");
+	//printk("Set node!\n");
 
 	return 0;
 }
@@ -256,8 +253,6 @@ int deleteMessage(mailbox* m)
 	m->count--;
 	spin_unlock(&m->mlock);
 	
-	printk("Deleted a message: %s\n", (char *) m->messages[0].msg);
-	
 	return 0;
 }
 
@@ -314,25 +309,21 @@ asmlinkage long sys_mailbox_send(pid_t dest, void *msg, int len, bool block)
 		createMailbox(pid);
 		printk("Created mailbox for process %d!", pid);
 	}
-	
-	printk(KERN_INFO "Started sending!\n");
 
 	if(block == true)
 		return MAILBOX_STOPPED;
-	printk(KERN_INFO "Mailbox not stopped!\n");
+	//printk(KERN_INFO "Mailbox not stopped!\n");
 	
 	if(len > MAX_MSG_SIZE || len < 0)
 		return MSG_LENGTH_ERROR;
-	printk(KERN_INFO "Message of right size.");
+	//printk(KERN_INFO "Message of right size.");
 	
 	if(getMailbox(dest) == NULL)
 		return MAILBOX_INVALID;
 	
-	printk(KERN_INFO "Mailbox valid!\n");
+	//printk(KERN_INFO "Mailbox valid!\n");
 	
-	m = getMailbox(pid);
-	if (m == NULL)
-		printk(KERN_INFO "m is NULL!\n");
+	m = getMailbox(dest);
 	
 	new_message.dest = dest;
 	new_message.len = len;
@@ -389,17 +380,13 @@ asmlinkage long sys_mailbox_rcv(pid_t *sender, void *msg, int *len, bool block)
 		printk("Created mailbox for process %d!", pid);
 	}
 
-	printk(KERN_INFO "Started receiving!\n");
+	//printk(KERN_INFO "Started receiving!\n");
 
 	if (block == true)
 		return MAILBOX_STOPPED;
-	printk(KERN_INFO "Mailbox not stopped!\n");
+	//printk(KERN_INFO "Mailbox not stopped!\n");
 	
 	m = getMailbox(pid);
-	if (m == NULL)
-		printk(KERN_INFO "m is NULL!\n");
-	
-	
 	
 	/* //try spinlock
 	while(spin_trylock(&(m->lock)) == 0)
@@ -443,7 +430,6 @@ asmlinkage long sys_mailbox_rcv(pid_t *sender, void *msg, int *len, bool block)
 
 asmlinkage long sys_mailbox_manage(bool stop, int *count)
 {
-	printk("Started managing function.\n");
 	pid_t pid;
 	mailbox* m;
 	/*
@@ -462,20 +448,12 @@ asmlinkage long sys_mailbox_manage(bool stop, int *count)
 		return MSG_ARG_ERROR;
 		*/
 		
-	printk("Still managing.\n");
-		
-		// PROBLEM IS IN GETMAILBOX
-		
 	if (getMailbox(pid) == NULL)
 	{
-		printk("About to create a mailbox for process %d!\n", pid);
 		createMailbox(pid);
-		printk("Created mailbox for process %d!\n", pid);
+		printk("Created mailbox for process %d!", pid);
 	}
-	
 
-	printk("Started managing mailbox.\n");
-	
 	m = getMailbox(pid);
 	printk("Got mailbox for pid %d!\n", pid);
 	
@@ -489,13 +467,13 @@ asmlinkage long sys_mailbox_manage(bool stop, int *count)
 	*/
 	
 	m->stop = stop;
-	printk("Managed stop.\n");
+	//printk("Managed stop.\n");
 	
 	*count = m->count;
 	
 	// spin_unlock(&(m->lock)); // unlock spinlock
 	
-	printk("There are %d messages in the mailbox.", *count);
+	//printk("There are %d messages in the mailbox.", *count);
 	
 	/*if(copy_to_user(count, &manage_count, sizeof(int)))
 	{
@@ -571,7 +549,7 @@ static int __init interceptor_start(void)
 	lcache = kmem_cache_create("Hash Tables Entries", sizeof(list_node), 0, 0, NULL);
 	
 	/* And indicate the load was successful */
-	printk(KERN_INFO "Loaded interceptor!");
+	printk(KERN_INFO "Loaded interceptor!\n");
 
 	return 0;
 }	// static int __init interceptor_start(void)
@@ -597,7 +575,7 @@ static void __exit interceptor_end(void)
 	kmem_cache_destroy(mcache);
 	kmem_cache_destroy(lcache);
 	
-	printk(KERN_INFO "Unloaded interceptor!");
+	printk(KERN_INFO "Unloaded interceptor!\n");
 }	// static void __exit interceptor_end(void)
 
 MODULE_LICENSE("GPL");
