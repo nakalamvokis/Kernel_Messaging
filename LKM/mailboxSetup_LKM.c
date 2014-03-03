@@ -66,6 +66,9 @@ asmlinkage long (*ref_sys_cs3013_syscall1)(void);
 asmlinkage long (*ref_sys_cs3013_syscall2)(void);
 asmlinkage long (*ref_sys_cs3013_syscall3)(void);
 
+//asmlinkage long (*ref_sys_exit)(DONT KNOW PARAMS YET);
+
+
 static struct kmem_cache* mcache;
 static struct kmem_cache* lcache;
 
@@ -249,6 +252,16 @@ int deleteMessage(mailbox* m)
 	
 	return 0;
 }
+
+/*
+asmlinkage long (*ref_sys_exit)(DONT KNOW PARAMS YET);
+{
+	pid_t pid;
+	pid = current->pid;
+	
+	deleteMailbox(pid);
+}
+*/
 
 
 asmlinkage long sys_mailbox_send(pid_t dest, void *msg, int len, bool block)
@@ -500,6 +513,8 @@ static int __init interceptor_start(void)
 	ref_sys_cs3013_syscall1 = (void *)sys_call_table[__NR_cs3013_syscall1];
 	ref_sys_cs3013_syscall2 = (void *)sys_call_table[__NR_cs3013_syscall2];
 	ref_sys_cs3013_syscall3 = (void *)sys_call_table[__NR_cs3013_syscall3];
+	
+	//ref_sys_exit = (void *)sys_call_table[__NR_exit];
 
 
 	/* Replace the existing system calls */
@@ -532,6 +547,9 @@ static void __exit interceptor_end(void)
 	sys_call_table[__NR_cs3013_syscall1] = (unsigned long *)ref_sys_cs3013_syscall1;
 	sys_call_table[__NR_cs3013_syscall2] = (unsigned long *)ref_sys_cs3013_syscall2;
 	sys_call_table[__NR_cs3013_syscall3] = (unsigned long *)ref_sys_cs3013_syscall3;
+	
+	//sys_call_table[__NR_exit] = (unsigned long *)ref_sys_exit;
+	
 	enable_page_protection();
 
 
