@@ -47,7 +47,6 @@ typedef struct mailbox
 	int count;
 	bool stop;
 	message_info messages[MAILBOX_SIZE];
-	wait_queue_head_t waitqueue;
 } mailbox;
 
 
@@ -179,15 +178,22 @@ int deleteMailbox(pid_t pid)
 	mailbox* m = getMailbox(pid);
 	list_node* node_ptr;
 	list_node* oldnode;
-
-	node_ptr = h.head;
 	
-
+	node_ptr = h.head;
+		
 	if (m == NULL)
-	{
 		return MAILBOX_INVALID;
-	}
+	
 	spin_lock(&m->mlock);
+	if (node_ptr->next_node == NULL)
+	{
+		h.head == NULL;
+		kmem_cache_free(lcache, node_ptr);
+		spin_unlock(&m->mlock);
+		kmem_cache_free(mcache, m);
+		return 0;
+	}
+	
 	while(node_ptr != NULL)
 	{
 		if (node_ptr->next_node->pid == pid)
@@ -257,15 +263,23 @@ message_info* getMessage(mailbox* m)
 int deleteMessage(mailbox* m)
 {
 	int i;
-	spin_lock(&m->mlock);
+	
 	if (m->count == 0)
 		return MAILBOX_EMPTY;
-
+	
+	spin_lock(&m->mlock);
 	kmem_cache_free(msgcache, m->messages[m->count - 1].msg);
-	for(i = 0; i < (m->count - 1); i++)
+	if (m->count == 1)
 	{
-		printk(".");
-		m->messages[i] = m->messages[i+1];
+		m->messages[0] == NULL;
+	}
+	else
+	{
+		for(i = 0; i < m->count; i++)
+		{
+			//printk(".");
+			m->messages[i] = m->messages[i+1];
+		}
 	}
 	m->count--;
 	spin_unlock(&m->mlock);
@@ -419,24 +433,18 @@ asmlinkage long sys_mailbox_rcv(pid_t *sender, void *msg, int *len, bool block)
 	
 	// get a message_info
 	rcv_message = getMessage(m);
-	*sender = rcv_message->sender;
-	mesg = (char *) rcv_message->msg;
-	*len = rcv_message->len;
 	
-	printk("Received a message: %s\n", (char *) mesg);
-	/*
-	if(copy_to_user(sender, &rcv_sender, sizeof(pid_t)))
-		return MSG_ARG_ERROR;
-		
-	if(copy_to_user(msg, rcv_msg, sizeof(void *)))
-		return MSG_ARG_ERROR;
-		
-	if(copy_to_user(len, &rcv_len, sizeof(int)))
-		return MSG_ARG_ERROR;
-	*/
+	printk("Received a message: %s\n", (char *) rcv_message->msg);
+	
 	spin_unlock(&m->mlock);
+	
+	if(copy_to_user(sender, &(rcv_message->sender), sizeof(pid_t)))
+		return MSG_ARG_ERROR;
+			
+	if(copy_to_user(len, &(rcv_message->len), sizeof(int)))
+		return MSG_ARG_ERROR;
 		
-	if(copy_to_user(msg, mesg, sizeof(char) * (*len)))
+	if(copy_to_user(msg, (char *) rcv_message->msg;, sizeof(char) * (*len)))
 		return MSG_ARG_ERROR;
 		
 	deleteMessage(m);
