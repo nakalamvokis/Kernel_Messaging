@@ -258,6 +258,8 @@ int deleteMessage(mailbox* m)
 {
 	int i;
 	spin_lock(&m->mlock);
+	if (m->count == 0)
+		return MAILBOX_EMPTY;
 
 	kmem_cache_free(msgcache, m->messages[m->count - 1].msg);
 	for(i = 0; i < (m->count - 1); i++)

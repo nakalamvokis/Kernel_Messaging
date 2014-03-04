@@ -1,4 +1,4 @@
-all: testmailbox1 testmailbox2 testmailbox3 testmailbox4 testmailbox5 testmailbox6 testmailbox7 customtest0 customtest1 
+all: testmailbox1 testmailbox2 testmailbox3 testmailbox4 testmailbox5 testmailbox7 customtest0 customtest1 customtest2
 
 customtest0: customtest0.o mailbox.o
 	gcc customtest0.o mailbox.o -o customtest0
@@ -6,6 +6,9 @@ customtest0: customtest0.o mailbox.o
 customtest1: customtest1.o mailbox.o
 	gcc customtest1.o mailbox.o -o customtest1
 
+customtest2: customtest2.o mailbox.o
+	gcc customtest2.o mailbox.o -o customtest2
+	
 testmailbox1: testmailbox1.o mailbox.o
 	gcc mailbox.o testmailbox1.o -o testmailbox1
 	
@@ -33,6 +36,9 @@ customtest0.o: customtest0.c mailbox.h
 customtest1.o: customtest1.c mailbox.h
 	gcc customtest1.c -c
 	
+customtest2.o: customtest2.c mailbox.h
+	gcc customtest2.c -c
+	
 testmailbox1.o: testmailbox1.c mailbox.h
 	gcc mailbox.h testmailbox1.c -c
 
@@ -58,4 +64,4 @@ mailbox.o: mailbox.c mailbox.h
 	gcc mailbox.c mailbox.h -c -g
 
 clean:
-	rm *.o *.gch testmailbox1 customtest0 customtest1
+	rm *.o *.gch testmailbox1 testmailbox2 testmailbox3 testmailbox4 testmailbox5 testmailbox7 customtest0 customtest1 customtest2
