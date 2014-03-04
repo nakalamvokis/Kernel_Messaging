@@ -26,6 +26,9 @@
 
 #define MAILBOX_SIZE 20
 
+
+// wait_queue_head_t waitqueue;
+
 // struct to be passed as parameter for send and recieve message syscall
 typedef struct message_info
 {
