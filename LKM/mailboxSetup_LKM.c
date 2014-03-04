@@ -323,7 +323,7 @@ asmlinkage long sys_mailbox_send(pid_t dest, void *msg, int len, bool block)
 		m->stop = true;
 	}
 	
-	if(m->stop == true)
+	/*if(m->stop == true)
 	{
 		DEFINE_WAIT(wait);
 		add_wait_queue(m->waitqueue, &wait);
@@ -339,7 +339,7 @@ asmlinkage long sys_mailbox_send(pid_t dest, void *msg, int len, bool block)
 		}
 		finish_wait(&(m->waitqueue), &wait);
 		spin_unlock(&m->mlock);	
-	}
+	}*/
 
 	//printk(KERN_INFO "Mailbox not stopped!\n");
 	
