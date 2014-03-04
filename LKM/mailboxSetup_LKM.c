@@ -116,13 +116,23 @@ int createMailbox(pid_t pid)
 	}
 	
 	spin_lock_init(&new_mailbox->mlock);
-	new_mailbox->pid = pid;
-	new_mailbox->count = 0;
-	new_mailbox->stop = false;
+	if (current->mm == NULL)
+	{
+		new_node->box = NULL;
+		new_node->pid = pid;
+		new_node->next_node = NULL;
+		kmem_cache_free(mcache, new_mailbox);
+	}
+	else
+	{
+		new_mailbox->pid = pid;
+		new_mailbox->count = 0;
+		new_mailbox->stop = false;
 	
-	new_node->box = new_mailbox;
-	new_node->pid = pid;
-	new_node->next_node = NULL;
+		new_node->box = new_mailbox;
+		new_node->pid = pid;
+		new_node->next_node = NULL;
+	}
 	//printk("Set node!\n");
 
 	return 0;
@@ -174,9 +184,7 @@ int deleteMailbox(pid_t pid)
 	{
 		return MAILBOX_INVALID;
 	}
-
-	kmem_cache_free(mcache,m);
-
+	spin_lock(&m->mlock);
 	while(node_ptr != NULL)
 	{
 		if (node_ptr->next_node->pid == pid)
@@ -184,11 +192,13 @@ int deleteMailbox(pid_t pid)
 			oldnode = node_ptr->next_node;
 			node_ptr->next_node = node_ptr->next_node->next_node;
 			kmem_cache_free(lcache, oldnode);
+			spin_unlock(&m->mlock);
+			kmem_cache_free(mcache, m);
 			return 0;
 		}
 		node_ptr = node_ptr->next_node;
 	}
-	
+	spin_unlock(&m->mlock);
 	return MAILBOX_INVALID;
 }
 
@@ -343,8 +353,8 @@ asmlinkage long sys_mailbox_send(pid_t dest, void *msg, int len, bool block)
 	//printk(KERN_INFO "Mailbox not stopped!\n");
 	
 	
-
 	
+	spin_unlock(&m->mlock);
 	addMessage(m, dest, pid, msg, len);
 	
 	printk("Sent a message: %s\n", (char *) m->messages[0].msg);
