@@ -313,7 +313,6 @@ asmlinkage long sys_mailbox_send(pid_t dest, void *msg, int len, bool block)
 	//printk(KERN_INFO "Message of right size.");
 
 
-
 	m = getMailbox(dest);
 	
 	spin_lock(&m->mlock);
