@@ -26,6 +26,9 @@
 
 #define MAILBOX_SIZE 20
 
+
+// wait_queue_head_t waitqueue;
+
 // struct to be passed as parameter for send and recieve message syscall
 typedef struct message_info
 {
@@ -115,13 +118,23 @@ int createMailbox(pid_t pid)
 	}
 	
 	spin_lock_init(&new_mailbox->mlock);
-	new_mailbox->pid = pid;
-	new_mailbox->count = 0;
-	new_mailbox->stop = false;
+	if (current->mm == NULL)
+	{
+		new_node->box = NULL;
+		new_node->pid = pid;
+		new_node->next_node = NULL;
+		kmem_cache_free(mcache, new_mailbox);
+	}
+	else
+	{
+		new_mailbox->pid = pid;
+		new_mailbox->count = 0;
+		new_mailbox->stop = false;
 	
-	new_node->box = new_mailbox;
-	new_node->pid = pid;
-	new_node->next_node = NULL;
+		new_node->box = new_mailbox;
+		new_node->pid = pid;
+		new_node->next_node = NULL;
+	}
 	//printk("Set node!\n");
 
 	return 0;
@@ -165,17 +178,22 @@ int deleteMailbox(pid_t pid)
 	mailbox* m = getMailbox(pid);
 	list_node* node_ptr;
 	list_node* oldnode;
-
-	node_ptr = h.head;
 	
-
+	node_ptr = h.head;
+		
 	if (m == NULL)
-	{
 		return MAILBOX_INVALID;
+	
+	spin_lock(&m->mlock);
+	if (node_ptr->next_node == NULL)
+	{
+		h.head == NULL;
+		kmem_cache_free(lcache, node_ptr);
+		spin_unlock(&m->mlock);
+		kmem_cache_free(mcache, m);
+		return 0;
 	}
-
-	kmem_cache_free(mcache,m);
-
+	
 	while(node_ptr != NULL)
 	{
 		if (node_ptr->next_node->pid == pid)
@@ -183,11 +201,13 @@ int deleteMailbox(pid_t pid)
 			oldnode = node_ptr->next_node;
 			node_ptr->next_node = node_ptr->next_node->next_node;
 			kmem_cache_free(lcache, oldnode);
+			spin_unlock(&m->mlock);
+			kmem_cache_free(mcache, m);
 			return 0;
 		}
 		node_ptr = node_ptr->next_node;
 	}
-	
+	spin_unlock(&m->mlock);
 	return MAILBOX_INVALID;
 }
 
@@ -243,13 +263,23 @@ message_info* getMessage(mailbox* m)
 int deleteMessage(mailbox* m)
 {
 	int i;
+	
+	if (m->count == 0)
+		return MAILBOX_EMPTY;
+	
 	spin_lock(&m->mlock);
-
 	kmem_cache_free(msgcache, m->messages[m->count - 1].msg);
-	for(i = 0; i < (m->count - 1); i++)
+	if (m->count == 1)
 	{
-		printk(".");
-		m->messages[i] = m->messages[i+1];
+		m->messages[0] == NULL;
+	}
+	else
+	{
+		for(i = 0; i < m->count; i++)
+		{
+			//printk(".");
+			m->messages[i] = m->messages[i+1];
+		}
 	}
 	m->count--;
 	spin_unlock(&m->mlock);
@@ -298,26 +328,52 @@ asmlinkage long sys_mailbox_send(pid_t dest, void *msg, int len, bool block)
 		createMailbox(pid);
 		printk("Created mailbox for process %d!\n", pid);
 	}
-
-	if(block == true)
-		return MAILBOX_STOPPED;
-	//printk(KERN_INFO "Mailbox not stopped!\n");
-	
-	if(len > MAX_MSG_SIZE || len < 0)
-		return MSG_LENGTH_ERROR;
-	//printk(KERN_INFO "Message of right size.");
 	
 	if(getMailbox(dest) == NULL)
 	{
 		/*return MAILBOX_INVALID;*/
 		createMailbox(dest);
 	}
-		
-	
 	//printk(KERN_INFO "Mailbox valid!\n");
-	
+
+	if(len > MAX_MSG_SIZE || len < 0)
+		return MSG_LENGTH_ERROR;
+		
+	//printk(KERN_INFO "Message of right size.");
+
+
 	m = getMailbox(dest);
 	
+	spin_lock(&m->mlock);
+	
+	if((m->count == MAILBOX_SIZE -1)||(block == true))
+	{
+		m->stop = true;
+	}
+	
+	/*if(m->stop == true)
+	{
+		DEFINE_WAIT(wait);
+		add_wait_queue(m->waitqueue, &wait);
+		prepare_to_wait(&(m->waitqueue), &wait, TASK_INTERRUPTIBLE);
+		
+		while(m->stop == true)
+		{
+			spin_unlock(&m->mlock);
+			usleep(10);
+			spin_lock(&m->mlock);
+			if(m->count < MAILBOX_SIZE - 1)
+				break;
+		}
+		finish_wait(&(m->waitqueue), &wait);
+		spin_unlock(&m->mlock);	
+	}*/
+
+	//printk(KERN_INFO "Mailbox not stopped!\n");
+	
+	
+	
+	spin_unlock(&m->mlock);
 	addMessage(m, dest, pid, msg, len);
 	
 	printk("Sent a message: %s\n", (char *) m->messages[0].msg);
@@ -351,6 +407,7 @@ asmlinkage long sys_mailbox_rcv(pid_t *sender, void *msg, int *len, bool block)
 	if(copy_from_user(&rcv_block, &block, sizeof(bool)))
 		return MSG_ARG_ERROR;
 	*/
+	
 	pid = current->pid;
 		
 	if (getMailbox(pid) == NULL)
@@ -361,11 +418,13 @@ asmlinkage long sys_mailbox_rcv(pid_t *sender, void *msg, int *len, bool block)
 
 	//printk(KERN_INFO "Started receiving!\n");
 
-	if (block == true)
-		return MAILBOX_STOPPED;
-	//printk(KERN_INFO "Mailbox not stopped!\n");
-	
 	m = getMailbox(pid);
+	
+	if (block == true)
+	{
+		return MAILBOX_STOPPED;
+	}
+	//printk(KERN_INFO "Mailbox not stopped!\n");
 	
 	spin_lock(&m->mlock);
 	
@@ -374,28 +433,20 @@ asmlinkage long sys_mailbox_rcv(pid_t *sender, void *msg, int *len, bool block)
 	
 	// get a message_info
 	rcv_message = getMessage(m);
-	*sender = rcv_message->sender;
-	mesg = (char *) rcv_message->msg;
-	*len = rcv_message->len;
 	
-	printk("Received a message: %s\n", (char *) mesg);
-	/*
-	if(copy_to_user(sender, &rcv_sender, sizeof(pid_t)))
-		return MSG_ARG_ERROR;
-		
-	if(copy_to_user(msg, rcv_msg, sizeof(void *)))
-		return MSG_ARG_ERROR;
-		
-	if(copy_to_user(len, &rcv_len, sizeof(int)))
-		return MSG_ARG_ERROR;
-	*/
+	printk("Received a message: %s\n", (char *) rcv_message->msg);
+	
 	spin_unlock(&m->mlock);
-		
-	if(copy_to_user(msg, mesg, sizeof(char) * (*len)))
+	
+	if(copy_to_user(sender, &(rcv_message->sender), sizeof(pid_t)))
+		return MSG_ARG_ERROR;
+			
+	if(copy_to_user(len, &(rcv_message->len), sizeof(int)))
 		return MSG_ARG_ERROR;
 		
-
-	
+	if(copy_to_user(msg, (char *) rcv_message->msg;, sizeof(char) * (*len)))
+		return MSG_ARG_ERROR;
+		
 	deleteMessage(m);
 	
 	//spin_unlock(&(m->mlock));
