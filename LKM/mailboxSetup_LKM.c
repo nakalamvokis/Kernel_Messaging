@@ -187,7 +187,7 @@ int deleteMailbox(pid_t pid)
 	spin_lock(&m->mlock);
 	if (node_ptr->next_node == NULL)
 	{
-		h.head == NULL;
+		h.head = NULL;
 		kmem_cache_free(lcache, node_ptr);
 		spin_unlock(&m->mlock);
 		kmem_cache_free(mcache, m);
@@ -271,7 +271,10 @@ int deleteMessage(mailbox* m)
 	kmem_cache_free(msgcache, m->messages[m->count - 1].msg);
 	if (m->count == 1)
 	{
-		m->messages[0] == NULL;
+		m->messages[0].dest = 0;
+		m->messages[0].sender = 0;
+		m->messages[0].len = 0;
+		m->messages[0].msg = NULL;
 	}
 	else
 	{
@@ -393,7 +396,6 @@ asmlinkage long sys_mailbox_rcv(pid_t *sender, void *msg, int *len, bool block)
 	int rcv_len;
 	bool rcv_block;*/
 	message_info *rcv_message;
-	char* mesg;
 	/*
 	if(copy_from_user(&rcv_sender, sender, sizeof(pid_t)))
 		return MSG_ARG_ERROR;
@@ -444,7 +446,7 @@ asmlinkage long sys_mailbox_rcv(pid_t *sender, void *msg, int *len, bool block)
 	if(copy_to_user(len, &(rcv_message->len), sizeof(int)))
 		return MSG_ARG_ERROR;
 		
-	if(copy_to_user(msg, (char *) rcv_message->msg;, sizeof(char) * (*len)))
+	if(copy_to_user(msg, (char *) rcv_message->msg, sizeof(char) * (*len)))
 		return MSG_ARG_ERROR;
 		
 	deleteMessage(m);
