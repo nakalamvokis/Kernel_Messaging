@@ -315,37 +315,10 @@ int deleteMessage(mailbox* m)
 asmlinkage long sys_mailbox_send(pid_t dest, void *msg, int len, bool block)
 {
 	mailbox* m;
-	pid_t pid;/*, send_dest;
-	void *send_msg;
-	int send_len;
-	bool send_block;
-	unsigned long status;*/
+	pid_t pid;
 	
 	pid = current->pid;
 
-	/*
-	if((status = copy_from_user(&send_dest, &dest, sizeof())))
-	{
-		printk("Made it past dest test %lu,  %d!\n", status, send_dest);
-		return MSG_ARG_ERROR;
-	}
-		
-	printk("Made it past dest test!\n");
-		
-	if(copy_from_user(send_msg, msg, sizeof(void *)))
-		return MSG_ARG_ERROR;
-		
-	printk("Made it past msg test!\n");
-		
-	if(copy_from_user(&send_len, &len, sizeof(len)))
-		return MSG_ARG_ERROR;
-		
-	printk("Made it past len test!\n");
-	
-	if(copy_from_user(&send_block, &block, sizeof(bool)))
-		return MSG_ARG_ERROR;
-		
-	printk("Made it past block test!\n");*/
 		
 	if (getMailbox(pid) == NULL)
 	{
@@ -411,25 +384,8 @@ asmlinkage long sys_mailbox_rcv(pid_t *sender, void *msg, int *len, bool block)
 {
 	pid_t pid;
 	mailbox* m;
-	/*
-	pid_t rcv_sender;
-	void *rcv_msg = (void *) "Uninitialized message";
-	int rcv_len;
-	bool rcv_block;*/
 	message_info *rcv_message;
-	/*
-	if(copy_from_user(&rcv_sender, sender, sizeof(pid_t)))
-		return MSG_ARG_ERROR;
-		
-	if(copy_from_user(rcv_msg, msg, sizeof(void *)))
-		return MSG_ARG_ERROR;
-		
-	if(copy_from_user(&rcv_len, len, sizeof(int)))
-		return MSG_ARG_ERROR;
-	
-	if(copy_from_user(&rcv_block, &block, sizeof(bool)))
-		return MSG_ARG_ERROR;
-	*/
+
 	
 	pid = current->pid;
 		
@@ -484,21 +440,8 @@ asmlinkage long sys_mailbox_manage(bool stop, int *count)
 {
 	pid_t pid;
 	mailbox* m;
-	/*
-	bool manage_stop;
-	int manage_count;
-	*/
-	
-	
 	
 	pid = current->pid;
-	/*
-	if(copy_from_user(&manage_stop, &stop, sizeof(bool)))
-		return MSG_ARG_ERROR;
-	
-	if(copy_from_user(&manage_count, count, sizeof(int)))
-		return MSG_ARG_ERROR;
-		*/
 		
 	if (getMailbox(pid) == NULL)
 	{
@@ -511,27 +454,10 @@ asmlinkage long sys_mailbox_manage(bool stop, int *count)
 	printk("Got mailbox for pid %d!\n", pid);
 	
 	
-	/* //try spinlock
-	while(spin_trylock(&(m->mlock)) == 0)
-	{
-	// wait for lock of spinlock
-	}
-	
-	*/
-	
 	m->stop = stop;
 	//printk("Managed stop.\n");
 	
 	*count = m->count;
-	
-	// spin_unlock(&(m->mlock)); // unlock spinlock
-	
-	//printk("There are %d messages in the mailbox.", *count);
-	
-	/*if(copy_to_user(count, &manage_count, sizeof(int)))
-	{
-		return MSG_ARG_ERROR;
-	}*/
 	
 	spin_unlock(&(m->mlock));
 	
