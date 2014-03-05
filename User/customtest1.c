@@ -1,3 +1,6 @@
+/* Nick Kalamvokis & Etienne Scraire
+ * CS3013 - Project 4
+ */
 #include <stdio.h>
 #include "mailbox.h"
 
