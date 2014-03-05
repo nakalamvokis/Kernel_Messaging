@@ -61,6 +61,7 @@ typedef struct list_node
 typedef struct hash_table
 {
 	list_node *head;
+	spinlock_t hlock;
 } hash_table;
 
 unsigned long **sys_call_table;
@@ -102,24 +103,28 @@ int createMailbox(pid_t pid)
 	mailbox* new_mailbox = kmem_cache_alloc(mcache, GFP_KERNEL);
 	message_info** new_msgq = kmem_cache_alloc(msgqcache, GFP_KERNEL);
 	
+	
 	if (h.head == NULL)
 	{
 		h.head = new_node;
+		spin_lock_init(&(h.hlock));
 	}
-	
+
 	else 
 	{
 		//printk("Node is not head!\n");
+		spin_lock(&(h.hlock));
 		node_ptr = h.head;
 		while(node_ptr->next_node != NULL)
 		{
 			node_ptr = node_ptr->next_node;
 		}
 		node_ptr->next_node = new_node;
+		spin_unlock(&(h.hlock));
 		//printk("Found node!\n");
 	}
 	
-	spin_lock_init(&new_mailbox->mlock);
+	spin_lock_init(&(new_mailbox->mlock));
 	if (current->mm == NULL)
 	{
 		new_node->box = NULL;
@@ -153,10 +158,14 @@ int createMailbox(pid_t pid)
 mailbox* getMailbox(pid_t pid)
 {
 	list_node* node_ptr;
+	
+	spin_lock(&(h.hlock));
+	
 	node_ptr = h.head;
 
 	if (node_ptr == NULL)
 	{
+		spin_unlock(&(h.hlock));
 		return NULL;
 	}
 		
@@ -167,9 +176,12 @@ mailbox* getMailbox(pid_t pid)
 	    
 	    if (node_ptr == NULL)
 		{
+	    	spin_unlock(&(h.hlock));
 			return NULL;
 		}
 	}
+	
+	spin_unlock(&(h.hlock));
 	return node_ptr->box;
 }
 
@@ -179,22 +191,29 @@ mailbox* getMailbox(pid_t pid)
  */
 int deleteMailbox(pid_t pid)
 {
-	mailbox* m = getMailbox(pid);
+	mailbox* m;
 	list_node* node_ptr;
 	list_node* oldnode;
+	
+	spin_lock(&(h.hlock));
+	
+	m = getMailbox(pid);
 	
 	node_ptr = h.head;
 		
 	if (m == NULL)
+	{
+		spin_unlock(&(h.hlock));
 		return MAILBOX_INVALID;
-	
-	spin_lock(&m->mlock);
+	}
+
 	if (node_ptr->next_node == NULL)
 	{
 		h.head = NULL;
 		kmem_cache_free(lcache, node_ptr);
 		spin_unlock(&m->mlock);
 		kmem_cache_free(mcache, m);
+		spin_unlock(&(h.hlock));
 		return 0;
 	}
 	
@@ -207,11 +226,14 @@ int deleteMailbox(pid_t pid)
 			kmem_cache_free(lcache, oldnode);
 			spin_unlock(&m->mlock);
 			kmem_cache_free(mcache, m);
+			spin_unlock(&(h.hlock));
 			return 0;
 		}
 		node_ptr = node_ptr->next_node;
 	}
+	
 	spin_unlock(&m->mlock);
+	
 	return MAILBOX_INVALID;
 }
 
@@ -225,7 +247,7 @@ int deleteMailbox(pid_t pid)
  */
 int addMessage(mailbox* m, pid_t dest, pid_t sender, void* msg, int len)
 {	
-	spin_lock(&m->mlock);
+	spin_lock(&(m->mlock));
 	
 	if(m->count == (MAILBOX_SIZE - 1))
 	{
@@ -272,7 +294,7 @@ int deleteMessage(mailbox* m)
 	if (m->count == 0)
 		return MAILBOX_EMPTY;
 	
-	spin_lock(&m->mlock);
+	spin_lock(&(m->mlock));
 	m->count--;
 	kmem_cache_free(msgcache, m->messages[m->count]->msg);
 	if (m->count != 0)
@@ -346,7 +368,7 @@ asmlinkage long sys_mailbox_send(pid_t dest, void *msg, int len, bool block)
 
 	m = getMailbox(dest);
 	
-	spin_lock(&m->mlock);
+	spin_lock(&(m->mlock));
 	
 	if((m->count == MAILBOX_SIZE -1)||(block == true))
 	{
@@ -427,7 +449,7 @@ asmlinkage long sys_mailbox_rcv(pid_t *sender, void *msg, int *len, bool block)
 	}
 	//printk(KERN_INFO "Mailbox not stopped!\n");
 	
-	spin_lock(&m->mlock);
+	spin_lock(&(m->mlock));
 	
 	if(m->count == 0)
 		return MAILBOX_EMPTY;
@@ -485,7 +507,7 @@ asmlinkage long sys_mailbox_manage(bool stop, int *count)
 	}
 
 	m = getMailbox(pid);
-	spin_lock(&m->mlock);
+	spin_lock(&(m->mlock));
 	printk("Got mailbox for pid %d!\n", pid);
 	
 	
@@ -511,7 +533,7 @@ asmlinkage long sys_mailbox_manage(bool stop, int *count)
 		return MSG_ARG_ERROR;
 	}*/
 	
-	spin_unlock(&m->mlock);
+	spin_unlock(&(m->mlock));
 	
 	return 0;
 }

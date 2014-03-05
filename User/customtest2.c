@@ -18,7 +18,7 @@ int main() {
     void *msg[128];
     int len;
 	int count;
-    ManageMailbox(false, &count);
+    //ManageMailbox(false, &count);
     if(status= RcvMsg(&sender,msg,&len,false))
     {printf("ERROR: %d\n", status);}
 	else 
