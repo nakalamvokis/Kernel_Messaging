@@ -328,10 +328,8 @@ asmlinkage long sys_mailbox_send(pid_t dest, void *msg, int len, bool block)
 	
 	if(getMailbox(dest) == NULL)
 	{
-		/*return MAILBOX_INVALID;*/
-		createMailbox(dest);
+		return MAILBOX_INVALID;
 	}
-	//printk(KERN_INFO "Mailbox valid!\n");
 
 	if(len > MAX_MSG_SIZE || len < 0)
 		return MSG_LENGTH_ERROR;
@@ -428,7 +426,7 @@ asmlinkage long sys_mailbox_rcv(pid_t *sender, void *msg, int *len, bool block)
 		
 	deleteMessage(m);
 	
-	//spin_unlock(&(m->mlock));
+	spin_unlock(&(m->mlock));
 	
 	return 0;
 }
