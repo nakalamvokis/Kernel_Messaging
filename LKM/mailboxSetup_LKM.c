@@ -46,7 +46,7 @@ typedef struct mailbox
 	spinlock_t mlock;
 	int count;
 	bool stop;
-	message_info messages[MAILBOX_SIZE];
+	message_info** messages;
 } mailbox;
 
 
@@ -75,7 +75,8 @@ asmlinkage void (*ref_sys_exit_group)(int exit_code);*/
 static struct kmem_cache* mcache;
 static struct kmem_cache* lcache;
 static struct kmem_cache* msgcache;
-
+static struct kmem_cache* msgqcache;
+static struct kmem_cache* msginfocache;
 static hash_table h;
  
 int createMailbox(pid_t pid);
@@ -99,6 +100,7 @@ int createMailbox(pid_t pid)
 	list_node* node_ptr;
 	list_node* new_node = kmem_cache_alloc(lcache, GFP_KERNEL);
 	mailbox* new_mailbox = kmem_cache_alloc(mcache, GFP_KERNEL);
+	message_info** new_msgq = kmem_cache_alloc(msgqcache, GFP_KERNEL);
 	
 	if (h.head == NULL)
 	{
@@ -124,13 +126,15 @@ int createMailbox(pid_t pid)
 		new_node->pid = pid;
 		new_node->next_node = NULL;
 		kmem_cache_free(mcache, new_mailbox);
+		kmem_cache_free(msgqcache, new_msgq);
 	}
 	else
 	{
 		new_mailbox->pid = pid;
 		new_mailbox->count = 0;
 		new_mailbox->stop = false;
-	
+		new_mailbox->messages = new_msgq;
+		
 		new_node->box = new_mailbox;
 		new_node->pid = pid;
 		new_node->next_node = NULL;
@@ -227,13 +231,14 @@ int addMessage(mailbox* m, pid_t dest, pid_t sender, void* msg, int len)
 	{
 		return MAILBOX_FULL;
 	}
-	m->messages[m->count].dest = dest;
-	m->messages[m->count].sender = sender;
-	m->messages[m->count].len = len;
-	m->messages[m->count].msg = kmem_cache_alloc(msgcache, GFP_KERNEL);
-	strncpy(m->messages[m->count].msg, (char *)msg, len);
+	m->messages[m->count] = kmem_cache_alloc(msginfocache, GFP_KERNEL);
+	m->messages[m->count]->dest = dest;
+	m->messages[m->count]->sender = sender;
+	m->messages[m->count]->len = len;
+	m->messages[m->count]->msg = kmem_cache_alloc(msgcache, GFP_KERNEL);
+	strncpy(m->messages[m->count]->msg, (char *)msg, len);
 	
-	printk("Added a message: %s\n", (char *) m->messages[m->count].msg);
+	printk("Added a message: %s\n", (char *) m->messages[m->count]->msg);
 	
 	m->count++;
 	spin_unlock(&m->mlock);
@@ -252,9 +257,9 @@ message_info* getMessage(mailbox* m)
 		return NULL;
 	}
 	
-	printk("Got a message: %s\n", (char *) m->messages[0].msg);
+	printk("Got a message: %s\n", (char *) m->messages[0]->msg);
 
-	return &(m->messages[0]);
+	return m->messages[0];
 }
 
 /* function to delete a message
@@ -268,23 +273,17 @@ int deleteMessage(mailbox* m)
 		return MAILBOX_EMPTY;
 	
 	spin_lock(&m->mlock);
-	kmem_cache_free(msgcache, m->messages[m->count - 1].msg);
-	if (m->count == 1)
+	m->count--;
+	kmem_cache_free(msgcache, m->messages[m->count]->msg);
+	if (m->count != 0)
 	{
-		m->messages[0].dest = 0;
-		m->messages[0].sender = 0;
-		m->messages[0].len = 0;
-		m->messages[0].msg = NULL;
-	}
-	else
-	{
-		for(i = 0; i < m->count; i++)
+		for(i = 1; i < m->count; i++)
 		{
 			//printk(".");
-			m->messages[i] = m->messages[i+1];
+			m->messages[i - 1] = m->messages[i];
 		}
 	}
-	m->count--;
+	kmem_cache_free(msginfocache, m->messages[m->count]);
 	spin_unlock(&m->mlock);
 	
 	return 0;
@@ -379,7 +378,7 @@ asmlinkage long sys_mailbox_send(pid_t dest, void *msg, int len, bool block)
 	spin_unlock(&m->mlock);
 	addMessage(m, dest, pid, msg, len);
 	
-	printk("Sent a message: %s\n", (char *) m->messages[0].msg);
+	printk("Sent a message: %s\n", (char *) m->messages[m->count - 1]->msg);
 	
 	return 0;
 }
@@ -603,6 +602,8 @@ static int __init interceptor_start(void)
 	mcache = kmem_cache_create("Mailboxes", sizeof(mailbox), 0, 0, NULL);
 	lcache = kmem_cache_create("Hash Tables Entries", sizeof(list_node), 0, 0, NULL);
 	msgcache = kmem_cache_create("Message", sizeof(char) * MAX_MSG_SIZE, 0, 0, NULL);
+	msgqcache = kmem_cache_create("Message queue", sizeof(message_info*) * MAILBOX_SIZE, 0, 0, NULL);
+	msginfocache = kmem_cache_create("Message info", sizeof(message_info), 0, 0, NULL);
 	
 	/* And indicate the load was successful */
 	printk(KERN_INFO "Loaded interceptor!\n");
@@ -631,6 +632,8 @@ static void __exit interceptor_end(void)
 	kmem_cache_destroy(mcache);
 	kmem_cache_destroy(lcache);
 	kmem_cache_destroy(msgcache);
+	kmem_cache_destroy(msgqcache);
+	kmem_cache_destroy(msginfocache);
 	printk(KERN_INFO "Unloaded interceptor!\n");
 }	// static void __exit interceptor_end(void)
 
